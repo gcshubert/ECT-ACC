@@ -7,5 +7,6 @@ public interface IScenarioService
     Task<ScenarioDto?> GetByIdAsync(int id);
     Task<ScenarioDto> CreateAsync(CreateScenarioDto dto);
     Task<ScenarioDto?> UpdateAsync(int id, UpdateScenarioDto dto);
+    Task<ScenarioParametersDto?> UpdateParametersAsync(int scenarioId, UpdateScenarioParametersDto dto);
     Task<bool> DeleteAsync(int id);
 }

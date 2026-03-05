@@ -43,6 +43,13 @@ public class ScenariosController : ControllerBase
         return updated is null ? NotFound() : Ok(updated);
     }
 
+    [HttpPut("{id}/parameters")]
+    public async Task<ActionResult<ScenarioParametersDto>> UpdateParameters(int id, UpdateScenarioParametersDto dto)
+    {
+        var updated = await _scenarioService.UpdateParametersAsync(id, dto);
+        return updated is null ? NotFound() : Ok(updated);
+    }
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {

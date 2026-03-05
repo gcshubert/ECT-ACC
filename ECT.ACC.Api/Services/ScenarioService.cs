@@ -89,6 +89,38 @@ public class ScenarioService :IScenarioService
         return true;
     }
 
+    public async Task<ScenarioParametersDto?> UpdateParametersAsync(int scenarioId, UpdateScenarioParametersDto dto)
+    {
+        var scenario = await _context.Scenarios
+            .Include(s => s.Parameters)
+            .FirstOrDefaultAsync(s => s.Id == scenarioId);
+
+        if (scenario is null) return null;
+
+        if (scenario.Parameters is null)
+        {
+            scenario.Parameters = new ScenarioParameters
+            {
+                ScenarioId = scenarioId,
+                Energy = new ScientificValue(dto.Energy.Coefficient, dto.Energy.Exponent),
+                Control = new ScientificValue(dto.Control.Coefficient, dto.Control.Exponent),
+                Complexity = new ScientificValue(dto.Complexity.Coefficient, dto.Complexity.Exponent),
+                TimeAvailable = new ScientificValue(dto.TimeAvailable.Coefficient, dto.TimeAvailable.Exponent)
+            };
+        }
+        else
+        {
+            scenario.Parameters.Energy = new ScientificValue(dto.Energy.Coefficient, dto.Energy.Exponent);
+            scenario.Parameters.Control = new ScientificValue(dto.Control.Coefficient, dto.Control.Exponent);
+            scenario.Parameters.Complexity = new ScientificValue(dto.Complexity.Coefficient, dto.Complexity.Exponent);
+            scenario.Parameters.TimeAvailable = new ScientificValue(dto.TimeAvailable.Coefficient, dto.TimeAvailable.Exponent);
+        }
+
+        await _context.SaveChangesAsync();
+
+        return MapToDto(scenario.Parameters);
+    }
+
     // Mapping helpers
     private static ScenarioDto MapToDto(Scenario scenario) => new()
     {
