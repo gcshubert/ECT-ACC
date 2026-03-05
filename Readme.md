@@ -154,6 +154,15 @@ Update-Database -Project ECT.ACC.Data -StartupProject ECT.ACC.Api -Verbose
 
 - **[ECT](https://github.com/gcshubert/ECT)** — React + Vite frontend consuming this API, providing an interactive ECT calculator and ACC deficit visualization
 
+### Published Frameworks
+
+**ECT Framework** — Energy-Control-Time
+- DOI: [https://doi.org/10.17605/OSF.IO/ZD6PV](https://doi.org/10.17605/OSF.IO/ZD6PV)
+- OSF: [https://osf.io/yqu5m](https://osf.io/yqu5m)
+
+**ACC Framework** — Algorithmic Control Characterization
+- DOI: [https://doi.org/10.17605/OSF.IO/765FA](https://doi.org/10.17605/OSF.IO/765FA)
+- OSF: [https://osf.io/u5rkq](https://osf.io/u5rkq)
 ---
 
 ## Author
