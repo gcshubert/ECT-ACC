@@ -111,6 +111,7 @@ The API is configured to accept requests from `http://localhost:5173` (the defau
 | GET | `/api/Scenarios/{id}` | Retrieve a scenario by ID |
 | POST | `/api/Scenarios` | Create a new scenario with parameters |
 | PUT | `/api/Scenarios/{id}` | Update scenario name/description |
+| PUT | `/api/Scenarios/{id}/parameters` | Update ECT parameters for a scenario |
 | DELETE | `/api/Scenarios/{id}` | Delete a scenario |
 
 ### Deficit Analysis
@@ -119,6 +120,8 @@ The API is configured to accept requests from `http://localhost:5173` (the defau
 |--------|-------|-------------|
 | GET | `/api/DeficitAnalysis/scenario/{scenarioId}` | Retrieve stored analysis for a scenario |
 | POST | `/api/DeficitAnalysis/scenario/{scenarioId}/compute` | Compute and persist ACC deficit analysis |
+
+
 
 ---
 
@@ -149,7 +152,7 @@ Update-Database -Project ECT.ACC.Data -StartupProject ECT.ACC.Api -Verbose
 
 ## Related Projects
 
-- **[CSReactApp](https://github.com/gcshubert/CSReactApp)** *(coming soon)* — React + Vite frontend consuming this API, providing an interactive ECT calculator and ACC deficit visualization
+- **[ECT](https://github.com/gcshubert/ECT)** — React + Vite frontend consuming this API, providing an interactive ECT calculator and ACC deficit visualization
 
 ---
 
