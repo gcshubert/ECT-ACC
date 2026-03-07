@@ -37,7 +37,7 @@ public partial class ECTDbContext : DbContext
 
             // Phase 3.5 — optional domain FK
             entity.HasOne<ProcessDomain>(e => e.ProcessDomain)
-                  .WithMany()
+                  .WithMany(static d => d.Scenarios)
                   .HasForeignKey(nameof(Scenario.ProcessDomainId))
                   .IsRequired(false)
                   .OnDelete(DeleteBehavior.SetNull);
@@ -108,7 +108,7 @@ public partial class ECTDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasOne(e => e.Scenario)
-                  .WithMany()
+                  .WithMany(s => s.ParameterDocumentations)
                   .HasForeignKey(e => e.ScenarioId)
                   .OnDelete(DeleteBehavior.Cascade);
 

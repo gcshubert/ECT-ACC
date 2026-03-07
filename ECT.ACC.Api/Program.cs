@@ -49,4 +49,9 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+// Seed domain + template data
+await using var scope = app.Services.CreateAsyncScope();
+var db = scope.ServiceProvider.GetRequiredService<ECTDbContext>();
+await db.SeedDomainsAsync();
+
 app.Run();

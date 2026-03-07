@@ -16,12 +16,6 @@ namespace ECT.ACC.Data.Migrations
                 type: "int",
                 nullable: true);
 
-            migrationBuilder.AddColumn<int>(
-                name: "ProcessDomainId1",
-                table: "Scenarios",
-                type: "int",
-                nullable: true);
-
             migrationBuilder.CreateTable(
                 name: "ParameterDefinitions",
                 columns: table => new
@@ -59,8 +53,7 @@ namespace ECT.ACC.Data.Migrations
                     ScenarioId = table.Column<int>(type: "int", nullable: false),
                     ParameterKey = table.Column<string>(type: "nvarchar(8)", maxLength: 8, nullable: false),
                     Label = table.Column<string>(type: "nvarchar(120)", maxLength: 120, nullable: false),
-                    DerivationNarrative = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    ScenarioId1 = table.Column<int>(type: "int", nullable: true)
+                    DerivationNarrative = table.Column<string>(type: "nvarchar(max)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -71,11 +64,6 @@ namespace ECT.ACC.Data.Migrations
                         principalTable: "Scenarios",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_ParameterDocumentations_Scenarios_ScenarioId1",
-                        column: x => x.ScenarioId1,
-                        principalTable: "Scenarios",
-                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -223,11 +211,6 @@ namespace ECT.ACC.Data.Migrations
                 column: "ProcessDomainId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Scenarios_ProcessDomainId1",
-                table: "Scenarios",
-                column: "ProcessDomainId1");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_ParameterDefinitions_ScenarioId_Key",
                 table: "ParameterDefinitions",
                 columns: new[] { "ScenarioId", "Key" },
@@ -238,11 +221,6 @@ namespace ECT.ACC.Data.Migrations
                 table: "ParameterDocumentations",
                 columns: new[] { "ScenarioId", "ParameterKey" },
                 unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ParameterDocumentations_ScenarioId1",
-                table: "ParameterDocumentations",
-                column: "ScenarioId1");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ParameterTemplates_ProcessDomainId",
@@ -276,13 +254,6 @@ namespace ECT.ACC.Data.Migrations
                 principalTable: "ProcessDomains",
                 principalColumn: "Id",
                 onDelete: ReferentialAction.SetNull);
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_Scenarios_ProcessDomains_ProcessDomainId1",
-                table: "Scenarios",
-                column: "ProcessDomainId1",
-                principalTable: "ProcessDomains",
-                principalColumn: "Id");
         }
 
         /// <inheritdoc />
@@ -290,10 +261,6 @@ namespace ECT.ACC.Data.Migrations
         {
             migrationBuilder.DropForeignKey(
                 name: "FK_Scenarios_ProcessDomains_ProcessDomainId",
-                table: "Scenarios");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_Scenarios_ProcessDomains_ProcessDomainId1",
                 table: "Scenarios");
 
             migrationBuilder.DropTable(
@@ -324,16 +291,8 @@ namespace ECT.ACC.Data.Migrations
                 name: "IX_Scenarios_ProcessDomainId",
                 table: "Scenarios");
 
-            migrationBuilder.DropIndex(
-                name: "IX_Scenarios_ProcessDomainId1",
-                table: "Scenarios");
-
             migrationBuilder.DropColumn(
                 name: "ProcessDomainId",
-                table: "Scenarios");
-
-            migrationBuilder.DropColumn(
-                name: "ProcessDomainId1",
                 table: "Scenarios");
         }
     }

@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ECT.ACC.Data.Migrations
 {
     [DbContext(typeof(ECTDbContext))]
-    [Migration("20260307035049_AddPhase3_And_Phase35_Extensions")]
+    [Migration("20260307074119_AddPhase3_And_Phase35_Extensions")]
     partial class AddPhase3_And_Phase35_Extensions
     {
         /// <inheritdoc />
@@ -129,12 +129,7 @@ namespace ECT.ACC.Data.Migrations
                     b.Property<int>("ScenarioId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("ScenarioId1")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("ScenarioId1");
 
                     b.HasIndex("ScenarioId", "ParameterKey")
                         .IsUnique();
@@ -248,14 +243,9 @@ namespace ECT.ACC.Data.Migrations
                     b.Property<int?>("ProcessDomainId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("ProcessDomainId1")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
                     b.HasIndex("ProcessDomainId");
-
-                    b.HasIndex("ProcessDomainId1");
 
                     b.ToTable("Scenarios");
                 });
@@ -538,14 +528,10 @@ namespace ECT.ACC.Data.Migrations
             modelBuilder.Entity("ECT.ACC.Data.Models.ParameterDocumentation", b =>
                 {
                     b.HasOne("ECT.ACC.Data.Models.Scenario", "Scenario")
-                        .WithMany()
+                        .WithMany("ParameterDocumentations")
                         .HasForeignKey("ScenarioId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("ECT.ACC.Data.Models.Scenario", null)
-                        .WithMany("ParameterDocumentations")
-                        .HasForeignKey("ScenarioId1");
 
                     b.Navigation("Scenario");
                 });
@@ -575,13 +561,9 @@ namespace ECT.ACC.Data.Migrations
             modelBuilder.Entity("ECT.ACC.Data.Models.Scenario", b =>
                 {
                     b.HasOne("ECT.ACC.Data.Models.ProcessDomain", "ProcessDomain")
-                        .WithMany()
+                        .WithMany("Scenarios")
                         .HasForeignKey("ProcessDomainId")
                         .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("ECT.ACC.Data.Models.ProcessDomain", null)
-                        .WithMany("Scenarios")
-                        .HasForeignKey("ProcessDomainId1");
 
                     b.Navigation("ProcessDomain");
                 });
