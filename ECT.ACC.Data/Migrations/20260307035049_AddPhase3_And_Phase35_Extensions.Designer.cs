@@ -4,6 +4,7 @@ using ECT.ACC.Data.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ECT.ACC.Data.Migrations
 {
     [DbContext(typeof(ECTDbContext))]
-    partial class ECTDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260307035049_AddPhase3_And_Phase35_Extensions")]
+    partial class AddPhase3_And_Phase35_Extensions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
