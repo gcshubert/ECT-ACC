@@ -185,7 +185,7 @@ public class ParameterDefinitionsController : ControllerBase
                 s.StepOrder, s.Name,
                 new ScientificValueDto { Coefficient = s.Value.Coefficient, Exponent = s.Value.Exponent },
                 (StepOperationDto)s.Operation,
-                new ScientificValueDto { Coefficient = s.Value.Coefficient, Exponent = s.Value.Exponent }
+                new ScientificValueDto { Coefficient = running.Coefficient, Exponent = running.Exponent }
             ));
         }
 

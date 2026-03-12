@@ -7,6 +7,7 @@ public class ScenarioDto
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public DateTime CreatedDate { get; set; }
+    public int? ProcessDomainId { get; set; }
     public ScenarioParametersDto? Parameters { get; set; }
     public DeficitAnalysisDto? DeficitAnalysis { get; set; }
 }

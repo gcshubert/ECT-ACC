@@ -10,7 +10,15 @@ public class Scenario
 
     // ── Existing navigation properties ────────────────────────────────────────
     public ScenarioParameters? Parameters { get; set; }
-    public DeficitAnalysis? DeficitAnalysis { get; set; }
+
+    /// <summary>
+    /// All deficit analyses for this scenario (one per configuration).
+    /// </summary>
+    public ICollection<DeficitAnalysis> DeficitAnalyses { get; set; }
+        = new List<DeficitAnalysis>();
+
+    /// <summary>True if at least one configuration has been activated and run.</summary>
+    public bool HasAnalysis => DeficitAnalyses.Any();
 
     // ── Phase 3 ───────────────────────────────────────────────────────────────
     public ICollection<ParameterDocumentation> ParameterDocumentations { get; set; }

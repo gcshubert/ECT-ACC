@@ -28,6 +28,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddScoped<IScenarioService, ScenarioService>();
 builder.Services.AddScoped<IDeficitAnalysisService, DeficitAnalysisService>();
+builder.Services.AddScoped<IScenarioConfigurationService, ScenarioConfigurationService>();
 
 var app = builder.Build();
 

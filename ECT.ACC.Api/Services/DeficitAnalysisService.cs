@@ -67,6 +67,49 @@ public class DeficitAnalysisService : IDeficitAnalysisService
         return MapToDto(analysis);
     }
 
+    /// <summary>
+    /// Computes deficit from rollup-derived values rather than flat legacy parameters.
+    /// Called by ActivateConfigurationAsync so configuration results are driven by
+    /// the derivation chain, not the stale ScenarioParameters table.
+    /// </summary>
+    public async Task<DeficitAnalysisDto> ComputeAndSaveFromRollupAsync(
+        int scenarioId,
+        int configurationId,
+        ScientificValue energy,
+        ScientificValue control,
+        ScientificValue complexity,
+        ScientificValue timeAvailable)
+    {
+        var cRequired  = ECTMath.ComputeMinimumControl(complexity, energy, timeAvailable);
+        var cAvailable = control;
+        var cDeficit   = ECTMath.ComputeDeficit(cRequired, cAvailable);
+        var deficitType = ECTMath.ClassifyDeficit(cDeficit);
+
+        // Remove any existing analysis tied to this configuration
+        var existing = await _context.DeficitAnalyses
+            .FirstOrDefaultAsync(d => d.ScenarioId == scenarioId
+                                   && d.ConfigurationId == configurationId);
+
+        if (existing is not null)
+            _context.DeficitAnalyses.Remove(existing);
+
+        var analysis = new DeficitAnalysis
+        {
+            ScenarioId      = scenarioId,
+            ConfigurationId = configurationId,
+            CRequired       = cRequired,
+            CAvailable      = cAvailable,
+            CDeficit        = cDeficit,
+            DeficitType     = deficitType,
+            ClassificationNotes = $"Computed from rollup on {DateTime.UtcNow:O}",
+        };
+
+        _context.DeficitAnalyses.Add(analysis);
+        await _context.SaveChangesAsync();
+
+        return MapToDto(analysis);
+    }
+
     private static DeficitAnalysisDto MapToDto(DeficitAnalysis d) => new()
     {
         Id = d.Id,

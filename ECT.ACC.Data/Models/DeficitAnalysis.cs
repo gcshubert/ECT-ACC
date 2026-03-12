@@ -12,7 +12,15 @@ public class DeficitAnalysis
     public string DeficitType { get; set; } = string.Empty;
     public string ClassificationNotes { get; set; } = string.Empty;
 
+    /// <summary>
+    /// FK to the ScenarioConfiguration that produced this result.
+    /// Null for ad-hoc runs (e.g. from the Parameters tab).
+    /// </summary>
+    public int? ConfigurationId { get; set; }
+    public ScenarioConfiguration? Configuration { get; set; }
 
     // Navigation property
     public Scenario? Scenario { get; set; }
+
+
 }

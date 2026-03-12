@@ -17,7 +17,7 @@ public class ScenarioService :IScenarioService
     {
         var scenarios = await _context.Scenarios
             .Include(s => s.Parameters)
-            .Include(s => s.DeficitAnalysis)
+            .Include(s => s.DeficitAnalyses)
             .ToListAsync();
         return scenarios.Select(MapToDto);
     }
@@ -25,7 +25,7 @@ public class ScenarioService :IScenarioService
     {
         var scenario = await _context.Scenarios
             .Include(s => s.Parameters)
-            .Include(s => s.DeficitAnalysis)
+            .Include(s => s.DeficitAnalyses)
             .FirstOrDefaultAsync(s => s.Id == id);
 
         return scenario is null ? null : MapToDto(scenario);
@@ -128,8 +128,12 @@ public class ScenarioService :IScenarioService
         Name = scenario.Name,
         Description = scenario.Description,
         CreatedDate = scenario.CreatedDate,
+        ProcessDomainId = scenario.ProcessDomainId,
         Parameters = scenario.Parameters is null ? null : MapToDto(scenario.Parameters),
-        DeficitAnalysis = scenario.DeficitAnalysis is null ? null : MapToDto(scenario.DeficitAnalysis)
+        DeficitAnalysis = scenario.DeficitAnalyses
+            .OrderByDescending(d => d.Id)
+            .Select(d => MapToDto(d))
+            .FirstOrDefault()
     };
 
     private static ScenarioParametersDto MapToDto(ScenarioParameters p) => new()

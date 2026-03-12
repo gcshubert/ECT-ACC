@@ -24,6 +24,10 @@ public partial class ECTDbContext : DbContext
     public DbSet<TemplateParameterDefinition> TemplateParameterDefinitions => Set<TemplateParameterDefinition>();
     public DbSet<ParameterDefinition> ParameterDefinitions => Set<ParameterDefinition>();
 
+    // ── Phase 5a ─────────────────────────────────────────────────────────────
+    public DbSet<ScenarioConfiguration> ScenarioConfigurations { get; set; }
+    public DbSet<ScenarioConfigurationEntry> ScenarioConfigurationEntries { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -74,13 +78,13 @@ public partial class ECTDbContext : DbContext
             });
         });
 
-        // ── DeficitAnalysis — one-to-one with Scenario ───────────────────────
+        // ── DeficitAnalysis — one-to-many with Scenario (one per configuration) ─
         modelBuilder.Entity<DeficitAnalysis>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.HasOne(e => e.Scenario)
-                  .WithOne(s => s.DeficitAnalysis)
-                  .HasForeignKey<DeficitAnalysis>(e => e.ScenarioId)
+                  .WithMany(s => s.DeficitAnalyses)
+                  .HasForeignKey(e => e.ScenarioId)
                   .OnDelete(DeleteBehavior.Cascade);
 
             entity.OwnsOne(e => e.CRequired, sv =>
@@ -113,7 +117,7 @@ public partial class ECTDbContext : DbContext
                   .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(e => new { e.ScenarioId, e.ParameterKey }).IsUnique();
-            entity.Property(e => e.ParameterKey).HasMaxLength(8).IsRequired();
+            entity.Property(e => e.ParameterKey).HasMaxLength(50).IsRequired();
             entity.Property(e => e.Label).HasMaxLength(120);
             entity.Property(e => e.DerivationNarrative).HasColumnType("nvarchar(max)");
         });
@@ -244,6 +248,64 @@ public partial class ECTDbContext : DbContext
             entity.Property(e => e.Label).HasMaxLength(120);
             entity.Property(e => e.Description).HasMaxLength(300);
             entity.Property(e => e.Unit).HasMaxLength(60);
+        });
+        // ── Phase 5a: ScenarioConfiguration ───────────────────────────────────
+        modelBuilder.Entity<ScenarioConfiguration>(static entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Name)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(e => e.Description)
+                  .HasMaxLength(1000);
+
+            entity.Property(e => e.SortOrder)
+                  .HasDefaultValue(0);
+
+            entity.Property(e => e.CreatedDate)
+                  .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasOne(e => e.Scenario)
+                  .WithMany()
+                  .HasForeignKey(e => e.ScenarioId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            // One-to-one back to DeficitAnalysis (optional)
+            entity.HasOne(e => e.DeficitAnalysis)
+                  .WithOne(d => d.Configuration)
+                  .HasForeignKey<DeficitAnalysis>(d => d.ConfigurationId)
+                  .OnDelete(DeleteBehavior.NoAction)  // ← to this
+                  .IsRequired(false);
+        });
+        // ── Phase 5a: ScenarioConfigurationEntry ───────────────────────────────────
+        modelBuilder.Entity<ScenarioConfigurationEntry>(static entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.ParameterKey)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(e => e.VariantLabel)
+                  .HasMaxLength(200)
+                  .HasDefaultValue("Base");
+
+            entity.OwnsOne(e => e.SnapshotValue, static owned =>
+            {
+                owned.Property(v => v.Coefficient).HasColumnName("SnapshotCoefficient");
+                owned.Property(v => v.Exponent).HasColumnName("SnapshotExponent");
+            });
+
+            entity.HasOne(e => e.Configuration)
+                  .WithMany(c => c.Entries)
+                  .HasForeignKey(e => e.ConfigurationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            // One entry per parameter per configuration
+            entity.HasIndex(e => new { e.ConfigurationId, e.ParameterKey })
+                  .IsUnique();
         });
     }
 }
