@@ -238,9 +238,13 @@ public class ScenarioConfigurationService : IScenarioConfigurationService
     public async Task<bool> DeleteConfigurationAsync(int scenarioId, int configId)
     {
         var config = await _db.ScenarioConfigurations
-            .FirstOrDefaultAsync(c => c.ScenarioId == scenarioId && c.Id == configId);
+            .Include(c => c.DeficitAnalysis)
+            .FirstOrDefaultAsync(c => c.Id == configId && c.ScenarioId == scenarioId);
 
         if (config is null) return false;
+
+        if (config.DeficitAnalysis is not null)
+            _db.DeficitAnalyses.Remove(config.DeficitAnalysis);
 
         _db.ScenarioConfigurations.Remove(config);
         await _db.SaveChangesAsync();

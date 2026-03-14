@@ -182,6 +182,42 @@ public class ParameterDocumentationController : ControllerBase
             new { scenarioId, paramKey }, MapVariant(variant));
     }
 
+    // ─── PUT: update a variant sub-parameter step ────────────────────────────
+    [HttpPut("variants/{variantId:int}/sub-parameters/{stepId:int}")]
+    [ProducesResponseType<VariantSubParameterDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateVariantStep(
+        int scenarioId, string paramKey, int variantId, int stepId,
+        [FromBody] UpdateSubParameterRequest request)
+    {
+        var step = await _db.VariantSubParameters
+            .Include(s => s.ParameterVariant)
+                .ThenInclude(v => v.ParameterDocumentation)
+            .FirstOrDefaultAsync(s => s.Id == stepId
+                && s.ParameterVariant.Id == variantId
+                && s.ParameterVariant.ParameterDocumentation.ScenarioId == scenarioId
+                && s.ParameterVariant.ParameterDocumentation.ParameterKey == paramKey);
+
+        if (step is null) return NotFound();
+
+        step.StepOrder       = request.StepOrder;
+        step.Name            = request.Name;
+        step.Value           = new ScientificValueOwned
+            { Coefficient = request.Value.Coefficient, Exponent = request.Value.Exponent };
+        step.Unit            = request.Unit;
+        step.Rationale       = request.Rationale;
+        step.SourceReference = request.SourceReference;
+        step.Operation       = (StepOperation)request.Operation;
+
+        await _db.SaveChangesAsync();
+        return Ok(new VariantSubParameterDto(
+            step.Id, step.StepOrder, step.Name,
+            new ScientificValueDto { Coefficient = step.Value.Coefficient, Exponent = step.Value.Exponent },
+            step.Unit, step.Rationale, step.SourceReference,
+            (StepOperationDto)step.Operation
+        ));
+    }
+
     // ─── DELETE: remove a variant ────────────────────────────────────────────
     [HttpDelete("variants/{variantId:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
