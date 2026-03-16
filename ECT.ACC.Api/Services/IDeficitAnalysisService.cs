@@ -25,4 +25,17 @@ public interface IDeficitAnalysisService
         ScientificValue control,
         ScientificValue complexity,
         ScientificValue timeAvailable);
+
+    /// <summary>
+    /// V2 graph-backed compute — delegates rollup to ECT.Graph.Api.
+    /// Walks the parameter topology for the given configuration, applies
+    /// the solve-for mode stored on the ScenarioNode, computes deficit,
+    /// and persists the result.
+    /// </summary>
+    Task<DeficitAnalysisDto> ComputeAndSaveFromGraphAsync(
+        int scenarioId,
+        int configurationId,
+        string scenarioGraphId,
+        string configurationGraphId,
+        string domain);
 }

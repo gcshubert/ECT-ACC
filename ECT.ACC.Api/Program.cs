@@ -1,3 +1,4 @@
+using ECT.ACC.Api.Clients;
 using ECT.ACC.Api.Services;
 using ECT.ACC.Data.Context;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +30,15 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<IScenarioService, ScenarioService>();
 builder.Services.AddScoped<IDeficitAnalysisService, DeficitAnalysisService>();
 builder.Services.AddScoped<IScenarioConfigurationService, ScenarioConfigurationService>();
+
+// ECT.Graph.Api client
+builder.Services.AddHttpClient<IGraphApiClient, GraphApiClient>(client =>
+{
+    client.BaseAddress = new Uri(
+        builder.Configuration["GraphApi:BaseUrl"]
+        ?? throw new InvalidOperationException(
+            "GraphApi:BaseUrl is not configured."));
+});
 
 var app = builder.Build();
 
