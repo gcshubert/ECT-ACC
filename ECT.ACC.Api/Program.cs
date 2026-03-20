@@ -1,6 +1,7 @@
 using ECT.ACC.Api.Clients;
 using ECT.ACC.Api.Services;
 using ECT.ACC.Data.Context;
+using ECT.ACC.Data.Math;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,6 +31,8 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<IScenarioService, ScenarioService>();
 builder.Services.AddScoped<IDeficitAnalysisService, DeficitAnalysisService>();
 builder.Services.AddScoped<IScenarioConfigurationService, ScenarioConfigurationService>();
+builder.Services.AddScoped<IHierarchicalScenarioService, HierarchicalScenarioService>();
+builder.Services.AddScoped<IGraphManagementService, GraphManagementService>();
 
 // ECT.Graph.Api client
 builder.Services.AddHttpClient<IGraphApiClient, GraphApiClient>(client =>
@@ -39,6 +42,9 @@ builder.Services.AddHttpClient<IGraphApiClient, GraphApiClient>(client =>
         ?? throw new InvalidOperationException(
             "GraphApi:BaseUrl is not configured."));
 });
+
+// HttpClient for GraphManagementService
+builder.Services.AddHttpClient<GraphManagementService>();
 
 var app = builder.Build();
 

@@ -44,7 +44,7 @@ public class DeficitAnalysisService : IDeficitAnalysisService
         var cAvailable = scenario.Parameters.Control;
 
         var cDeficit = ECTMath.ComputeDeficit(cRequired, cAvailable);
-        var deficitType = ECTMath.ClassifyDeficit(cDeficit);
+        var deficitType = ECTMath.ClassifyDeficit(cDeficit, "C", "Manufacturing");
 
         var existing = await _context.DeficitAnalyses
             .FirstOrDefaultAsync(d => d.ScenarioId == scenarioId);
@@ -59,7 +59,7 @@ public class DeficitAnalysisService : IDeficitAnalysisService
             CAvailable = cAvailable,
             CDeficit = cDeficit,
             DeficitType = deficitType,
-            ClassificationNotes = $"Computed via ECTMath on {DateTime.UtcNow:O}"
+            ClassificationNotes = $"Transitional classifier on {DateTime.UtcNow:O}"
         };
 
         _context.DeficitAnalyses.Add(analysis);
@@ -79,7 +79,7 @@ public class DeficitAnalysisService : IDeficitAnalysisService
         var cRequired = ECTMath.SolveForC(complexity, energy, timeAvailable);
         var cAvailable = control;
         var cDeficit = ECTMath.ComputeDeficit(cRequired, cAvailable);
-        var deficitType = ECTMath.ClassifyDeficit(cDeficit);
+        var deficitType = ECTMath.ClassifyDeficit(cDeficit, "C", "Manufacturing");
 
         var existing = await _context.DeficitAnalyses
             .FirstOrDefaultAsync(d => d.ScenarioId == scenarioId
@@ -96,7 +96,7 @@ public class DeficitAnalysisService : IDeficitAnalysisService
             CAvailable = cAvailable,
             CDeficit = cDeficit,
             DeficitType = deficitType,
-            ClassificationNotes = $"Computed from rollup on {DateTime.UtcNow:O}",
+            ClassificationNotes = $"Transitional classifier from rollup on {DateTime.UtcNow:O}",
         };
 
         _context.DeficitAnalyses.Add(analysis);
@@ -165,6 +165,79 @@ public class DeficitAnalysisService : IDeficitAnalysisService
         await _context.SaveChangesAsync();
 
         return MapToDto(analysis);
+    }
+
+    public async Task<DiagnosticNodeDto> ComputeHierarchicalAsync(
+        int scenarioId,
+        int configurationId,
+        string scenarioGraphId,
+        string configurationGraphId,
+        string domain)
+    {
+        var walk = await _graphClient.GetConfigurationWalkTreeAsync(
+            scenarioGraphId,
+            configurationGraphId);
+
+        var (cRequired, cAvailable) = walk.SolveForMode switch
+        {
+            "C" => (
+                ECTMath.SolveForC(walk.Complexity, walk.Energy, walk.TimeAvailable),
+                walk.Control),
+
+            "C_FromET" => (
+                ECTMath.SolveForC_FromETProduct(
+                    walk.Complexity,
+                    ScientificValue.Multiply(walk.Energy, walk.TimeAvailable)),
+                walk.Control),
+
+            _ => throw new InvalidOperationException(
+                $"SolveForMode '{walk.SolveForMode}' does not produce a control deficit. " +
+                $"Use a dedicated endpoint for T, E, k, and combined solve-for modes.")
+        };
+
+        var cDeficit = ECTMath.ComputeDeficit(cRequired, cAvailable);
+        var deficitType = ECTMath.ClassifyDeficit(cDeficit, walk.SolveForMode, domain);
+
+        return BuildDiagnosticTree(walk.RootResult, walk.SolveForMode, domain, deficitType);
+    }
+
+    private DiagnosticNodeDto BuildDiagnosticTree(GraphNodeResultTree node, string solveForMode, string domain, string overallType)
+    {
+        string classification;
+        if (overallType == "N/A" || overallType == "None")
+        {
+            classification = overallType;
+        }
+        else
+        {
+            classification = ClassifyContribution(node, solveForMode, overallType);
+        }
+
+        var children = node.Children.Select(c => BuildDiagnosticTree(c, solveForMode, domain, overallType)).ToList();
+        return new DiagnosticNodeDto(
+            node.NodeId,
+            node.Name,
+            node.Role,
+            classification,
+            children
+        );
+    }
+
+    private string ClassifyContribution(GraphNodeResultTree node, string solveForMode, string overallType)
+    {
+        if (node.EffectiveValue is null) return "N/A";
+
+        var logValue = node.EffectiveValue.ToLog10();
+        var role = node.Role;
+
+        if (solveForMode == "C" || solveForMode == "C_FromET")
+        {
+            if (role == "k" && logValue > 6) return "High Complexity Contributor";
+            if (role == "E" && logValue < 3) return "Low Energy Contributor";
+            if (role == "T" && logValue < 3) return "Low Time Contributor";
+        }
+
+        return overallType;
     }
 
     private static DeficitAnalysisDto MapToDto(DeficitAnalysis d) => new()

@@ -47,6 +47,24 @@ public class GraphApiClient : IGraphApiClient
         return MapToResult(dto);
     }
 
+    public async Task<GraphWalkResultTree> GetConfigurationWalkTreeAsync(
+        string scenarioGraphId,
+        string configurationGraphId)
+    {
+        var url = $"api/walk/scenario/{scenarioGraphId}/configuration/{configurationGraphId}";
+
+        var response = await _http.GetAsync(url);
+        response.EnsureSuccessStatusCode();
+
+        var dto = await response.Content
+            .ReadFromJsonAsync<GraphWalkResponseTreeDto>(JsonOptions)
+            ?? throw new InvalidOperationException(
+                $"Graph walk tree returned null for scenario {scenarioGraphId}, " +
+                $"configuration {configurationGraphId}.");
+
+        return MapToTreeResult(dto);
+    }
+
     // -------------------------------------------------------------------------
     // Mapping — graph service DTOs → ECT.ACC domain types
     // -------------------------------------------------------------------------
@@ -65,6 +83,30 @@ public class GraphApiClient : IGraphApiClient
         Role: n.Role,
         EffectiveValue: n.EffectiveValue is null ? null : MapValue(n.EffectiveValue),
         WeightedContribution: n.WeightedContribution);
+
+    private static GraphWalkResultTree MapToTreeResult(GraphWalkResponseTreeDto dto) => new(
+        ScenarioNodeId: dto.ScenarioNodeId,
+        ConfigurationNodeId: dto.ConfigurationNodeId,
+        SolveForMode: dto.SolveForMode,
+        Energy: MapValue(dto.Energy),
+        Control: MapValue(dto.Control),
+        Complexity: MapValue(dto.Complexity),
+        TimeAvailable: MapValue(dto.TimeAvailable),
+        RootResult: MapNodeTree(dto.RootResult),
+        RollupValue: dto.RollupValue is null ? null : MapValue(dto.RollupValue),
+        ComputedAt: dto.ComputedAt
+    );
+
+    private static GraphNodeResultTree MapNodeTree(GraphNodeTreeDto n) => new(
+        NodeId: n.NodeId,
+        Name: n.Name,
+        Role: n.Role,
+        EffectiveValue: n.EffectiveValue is null ? null : MapValue(n.EffectiveValue),
+        Weight: n.Weight,
+        RollupOperator: n.RollupOperator,
+        IsLeaf: n.IsLeaf,
+        Children: n.Children.Select(MapNodeTree).ToList()
+    );
 
     private static ScientificValue MapValue(ScientificValueDto v) =>
         new(v.Coefficient, v.Exponent);
@@ -99,4 +141,32 @@ public class GraphApiClient : IGraphApiClient
         public double Coefficient { get; init; }
         public double Exponent { get; init; }
     }
+
+    private sealed class GraphWalkResponseTreeDto
+    {
+        public string ScenarioNodeId { get; init; } = null!;
+        public string? ConfigurationNodeId { get; init; }
+        public string SolveForMode { get; init; } = null!;
+        public ScientificValueDto Energy { get; init; } = null!;
+        public ScientificValueDto Control { get; init; } = null!;
+        public ScientificValueDto Complexity { get; init; } = null!;
+        public ScientificValueDto TimeAvailable { get; init; } = null!;
+        public GraphNodeTreeDto RootResult { get; init; } = null!;
+        public ScientificValueDto? RollupValue { get; init; }
+        public DateTimeOffset ComputedAt { get; init; }
+    }
+
+    private sealed class GraphNodeTreeDto
+    {
+        public string NodeId { get; init; } = null!;
+        public string Name { get; init; } = null!;
+        public string Role { get; init; } = null!;
+        public ScientificValueDto? EffectiveValue { get; init; }
+        public double Weight { get; init; }
+        public string RollupOperator { get; init; } = null!;
+        public bool IsLeaf { get; init; }
+        public List<GraphNodeTreeDto> Children { get; init; } = [];
+    }
+
 }
+

@@ -38,4 +38,15 @@ public interface IDeficitAnalysisService
         string scenarioGraphId,
         string configurationGraphId,
         string domain);
+
+    /// <summary>
+    /// V2 hierarchical diagnostic compute — produces a diagnostic tree
+    /// showing deficit contributions at each node in the parameter topology.
+    /// </summary>
+    Task<DiagnosticNodeDto> ComputeHierarchicalAsync(
+        int scenarioId,
+        int configurationId,
+        string scenarioGraphId,
+        string configurationGraphId,
+        string domain);
 }

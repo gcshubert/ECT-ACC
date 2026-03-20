@@ -85,4 +85,46 @@ public class DeficitAnalysisController : ControllerBase
             return BadRequest(ex.Message);
         }
     }
+
+    /// <summary>
+    /// V2 hierarchical deficit compute — returns a diagnostic tree
+    /// showing deficit contributions at each node in the parameter topology.
+    ///
+    /// scenarioGraphId and configurationGraphId are the UUID node identifiers
+    /// in Neo4j (not the SQL Server integer IDs). The solve-for mode is
+    /// resolved by the graph service from the ScenarioNode.
+    ///
+    /// Only valid for C and C_FromET solve-for modes.
+    /// </summary>
+    [HttpPost("scenario/{scenarioId}/configuration/{configurationId}/compute-v2-hierarchical")]
+    public async Task<ActionResult<DiagnosticNodeDto>> ComputeHierarchical(
+        int scenarioId,
+        int configurationId,
+        [FromQuery] string scenarioGraphId,
+        [FromQuery] string configurationGraphId,
+        [FromQuery] string domain)
+    {
+        if (string.IsNullOrWhiteSpace(scenarioGraphId))
+            return BadRequest("scenarioGraphId is required.");
+        if (string.IsNullOrWhiteSpace(configurationGraphId))
+            return BadRequest("configurationGraphId is required.");
+        if (string.IsNullOrWhiteSpace(domain))
+            return BadRequest("domain is required.");
+
+        try
+        {
+            var tree = await _deficitAnalysisService.ComputeHierarchicalAsync(
+                scenarioId,
+                configurationId,
+                scenarioGraphId,
+                configurationGraphId,
+                domain);
+
+            return Ok(tree);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
 }

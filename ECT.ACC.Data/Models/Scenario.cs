@@ -6,6 +6,19 @@ public class Scenario
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Solve-for mode for the scenario (e.g. C, T, E, C_FromET, etc.).
+    /// Used by V2 hierarchical analysis.
+    /// </summary>
+    public string SolveForMode { get; set; } = "C";
+
+    /// <summary>
+    /// Indicates whether the scenario uses the flat (V1) parameter model
+    /// or the hierarchical (V2) graph model.
+    /// </summary>
+    public string ScenarioMode { get; set; } = "Flat";
+
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 
     // ── Existing navigation properties ────────────────────────────────────────

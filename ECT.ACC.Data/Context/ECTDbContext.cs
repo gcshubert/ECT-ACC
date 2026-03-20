@@ -39,6 +39,16 @@ public partial class ECTDbContext : DbContext
             entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
             entity.Property(e => e.Description).HasMaxLength(2000);
 
+            entity.Property(e => e.SolveForMode)
+                  .IsRequired()
+                  .HasMaxLength(20)
+                  .HasDefaultValue("C");
+
+            entity.Property(e => e.ScenarioMode)
+                  .IsRequired()
+                  .HasMaxLength(20)
+                  .HasDefaultValue("Flat");
+
             // Phase 3.5 — optional domain FK
             entity.HasOne<ProcessDomain>(e => e.ProcessDomain)
                   .WithMany(static d => d.Scenarios)

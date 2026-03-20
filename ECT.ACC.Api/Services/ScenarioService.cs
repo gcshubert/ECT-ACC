@@ -3,15 +3,22 @@ using ECT.ACC.Data.Context;
 using ECT.ACC.Data.Models;
 using ECT.ACC.Data.Math;
 using Microsoft.EntityFrameworkCore;
+using ECT.ACC.Api.Services;
+using Microsoft.Extensions.Logging;
 
 namespace ECT.ACC.Api.Services;
 
 public class ScenarioService :IScenarioService
 {
     private readonly ECTDbContext _context;
-    public ScenarioService(ECTDbContext context)
+    private readonly IGraphManagementService _graphService;
+    private readonly ILogger<ScenarioService> _logger;
+
+    public ScenarioService(ECTDbContext context, IGraphManagementService graphService, ILogger<ScenarioService> logger)
     {  
-        _context = context; 
+        _context = context;
+        _graphService = graphService;
+        _logger = logger;
     }
     public async Task<IEnumerable<ScenarioDto>> GetAllAsync()
     {
@@ -37,31 +44,75 @@ public class ScenarioService :IScenarioService
         {
             Name = dto.Name,
             Description = dto.Description,
+            ScenarioMode = dto.ScenarioMode, // "Flat" or "Hierarchical"
+            SolveForMode = dto.SolveForMode,
             CreatedDate = DateTime.UtcNow
         };
 
+        // --- STEP 1: ALWAYS MAP PARAMETERS TO SQL ---
+        // Whether Flat or Hierarchical, the SQL DB needs these 8 values.
         if (dto.Parameters is not null)
         {
             scenario.Parameters = new ScenarioParameters
             {
-                Energy = new ScientificValue(
-                    dto.Parameters.Energy.Coefficient,
-                    dto.Parameters.Energy.Exponent),
-                Control = new ScientificValue(
-                    dto.Parameters.Control.Coefficient,
-                    dto.Parameters.Control.Exponent),
-                Complexity = new ScientificValue(
-                    dto.Parameters.Complexity.Coefficient,
-                    dto.Parameters.Complexity.Exponent),
-                TimeAvailable = new ScientificValue(
-                    dto.Parameters.TimeAvailable.Coefficient,
-                    dto.Parameters.TimeAvailable.Exponent)
+                Energy = new ScientificValue(dto.Parameters.Energy.Coefficient, dto.Parameters.Energy.Exponent),
+                Control = new ScientificValue(dto.Parameters.Control.Coefficient, dto.Parameters.Control.Exponent),
+                Complexity = new ScientificValue(dto.Parameters.Complexity.Coefficient, dto.Parameters.Complexity.Exponent),
+                TimeAvailable = new ScientificValue(dto.Parameters.TimeAvailable.Coefficient, dto.Parameters.TimeAvailable.Exponent)
             };
         }
+
         _context.Scenarios.Add(scenario);
         await _context.SaveChangesAsync();
 
+        // --- STEP 2: CONDITIONAL GRAPH SYNC ---
+        // Only 'Hierarchical' scenarios cross the bridge to Neo4j.
+        if (scenario.ScenarioMode == "Hierarchical")
+        {
+            try
+            {
+                // 1. Create the Scenario Identity in Neo4j
+                // This stops the "Scenario Not Found" errors.
+                await _graphService.EnsureScenarioGraphExistsAsync(
+                    scenario.Id,
+                    scenario.Name,
+                    scenario.Description ?? string.Empty,
+                    scenario.SolveForMode,
+                    scenario.ProcessDomainId?.ToString() ?? "Global"
+                );
+
+                // 2. Seed the 8 Scientific Parameters (E, T, C, k)
+                // This ensures the "Add Step" logic has its base values immediately.
+                var usesDto = new UsesEdgeDto
+                {
+                    ScenarioNodeId = scenario.Id.ToString(),
+                    RootParameterNodeId = $"root-{scenario.Id}",
+                    BaseParameterValues = MapToGraphValues(scenario.Parameters)
+                };
+
+                await _graphService.UpsertUsesEdgeAsync(scenario.Id, usesDto);
+            }
+            catch (Exception ex)
+            {
+                // Log it—the "Self-Healing" GET we added to the Graph API earlier
+                // will act as the final safety net if this fails!
+                _logger.LogWarning(ex, "Initial Graph sync for Scenario {Id} was incomplete.", scenario.Id);
+            }
+        }
         return MapToDto(scenario);
+    }
+
+    private static Dictionary<string, double> MapToGraphValues(ScenarioParameters? p)
+    {
+        if (p == null) return new Dictionary<string, double>();
+
+        return new Dictionary<string, double>
+            {
+                { "E_coeff", p.Energy.Coefficient }, { "E_exp", p.Energy.Exponent },
+                { "T_coeff", p.TimeAvailable.Coefficient }, { "T_exp", p.TimeAvailable.Exponent },
+                { "C_coeff", p.Complexity.Coefficient }, { "C_exp", p.Complexity.Exponent },
+                { "k_coeff", p.Control.Coefficient }, { "k_exp", p.Control.Exponent }
+            };
     }
 
     public async Task<ScenarioDto?> UpdateAsync(int id, UpdateScenarioDto dto)
@@ -70,8 +121,10 @@ public class ScenarioService :IScenarioService
 
         if (scenario is null) return null;
 
-        scenario.Name = dto.Name;
-        scenario.Description = dto.Description;
+        if (dto.Name is not null) scenario.Name = dto.Name;
+        if (dto.Description is not null) scenario.Description = dto.Description;
+        if (dto.ScenarioMode is not null) scenario.ScenarioMode = dto.ScenarioMode;
+        if (dto.SolveForMode is not null) scenario.SolveForMode = dto.SolveForMode;
 
         await _context.SaveChangesAsync();
 
@@ -129,6 +182,11 @@ public class ScenarioService :IScenarioService
         Description = scenario.Description,
         CreatedDate = scenario.CreatedDate,
         ProcessDomainId = scenario.ProcessDomainId,
+
+        // Add these missing property mappings
+        ScenarioMode = scenario.ScenarioMode,
+        SolveForMode = scenario.SolveForMode,
+
         Parameters = scenario.Parameters is null ? null : MapToDto(scenario.Parameters),
         DeficitAnalysis = scenario.DeficitAnalyses
             .OrderByDescending(d => d.Id)

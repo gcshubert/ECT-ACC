@@ -203,10 +203,6 @@ public static class ECTMath
         };
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
-
     /// <summary>
     /// Returns true if the solve-for mode produces a control deficit (C_req vs C_avail).
     /// Only "C" modes yield a meaningful deficit — T, E, k, and combined modes do not.

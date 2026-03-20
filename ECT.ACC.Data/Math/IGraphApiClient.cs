@@ -1,6 +1,6 @@
 ﻿using ECT.ACC.Data.Math;
 
-namespace ECT.ACC.Api.Clients;
+namespace ECT.ACC.Data.Math;
 
 /// <summary>
 /// Contract for delegating analytical work to ECT.Graph.Api.
@@ -14,9 +14,40 @@ public interface IGraphApiClient
     /// </summary>
     Task<GraphWalkResult> GetConfigurationWalkAsync(
         string scenarioGraphId,
-        string configurationGraphId,
-        string solveForMode);
+        string configurationGraphId);
+
+    /// <summary>
+    /// Executes a configuration-level graph walk and returns a tree structure
+    /// for hierarchical deficit analysis.
+    /// </summary>
+    Task<GraphWalkResultTree> GetConfigurationWalkTreeAsync(
+        string scenarioGraphId,
+        string configurationGraphId);
 }
+
+public record GraphWalkResultTree(
+    string ScenarioNodeId,
+    string? ConfigurationNodeId,
+    string SolveForMode,
+    ScientificValue Energy,
+    ScientificValue Control,
+    ScientificValue Complexity,
+    ScientificValue TimeAvailable,
+    GraphNodeResultTree RootResult,
+    ScientificValue? RollupValue,
+    DateTimeOffset ComputedAt
+);
+
+public record GraphNodeResultTree(
+    string NodeId,
+    string Name,
+    string Role,
+    ScientificValue? EffectiveValue,
+    double Weight,
+    string RollupOperator,
+    bool IsLeaf,
+    List<GraphNodeResultTree> Children
+);
 
 /// <summary>
 /// Rolled-up ECT core parameter values returned from a graph walk.
