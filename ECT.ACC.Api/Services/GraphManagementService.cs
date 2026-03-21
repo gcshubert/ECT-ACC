@@ -1,5 +1,7 @@
-using ECT.ACC.Contracts.DTOs;
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using ECT.ACC.Contracts.DTOs;
 
 namespace ECT.ACC.Api.Services;
 
@@ -85,8 +87,31 @@ public class GraphManagementService : IGraphManagementService
 
     public async Task<IEnumerable<ParameterNodeDto>> GetParameterNodesAsync(int scenarioId)
     {
-        var nodes = await _httpClient.GetFromJsonAsync<IEnumerable<ParameterNodeDto>>($"{_graphApiBaseUrl}/ParameterNodes");
+        var response = await _httpClient.GetAsync($"{_graphApiBaseUrl}/ParameterNodes");
+        if (!response.IsSuccessStatusCode) return Enumerable.Empty<ParameterNodeDto>();
+
+        var nodes = await response.Content
+            .ReadFromJsonAsync<IEnumerable<ParameterNodeDto>>(new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter() }
+            });
+
         return nodes ?? Enumerable.Empty<ParameterNodeDto>();
+    }
+
+    public async Task<IEnumerable<ContributesToEdgeSummaryDto>> GetContributesToEdgesAsync()
+    {
+        var response = await _httpClient.GetAsync($"{_graphApiBaseUrl}/Edges/contributes-to");
+        if (!response.IsSuccessStatusCode) return Enumerable.Empty<ContributesToEdgeSummaryDto>();
+
+        var edges = await response.Content
+            .ReadFromJsonAsync<IEnumerable<ContributesToEdgeSummaryDto>>(new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+        return edges ?? Enumerable.Empty<ContributesToEdgeSummaryDto>();
     }
 
     public async Task<ParameterNodeDto?> UpdateParameterNodeAsync(int scenarioId, string nodeId, UpdateParameterNodeDto dto)
@@ -114,23 +139,41 @@ public class GraphManagementService : IGraphManagementService
 
     public async Task<EdgeDto> CreateEdgeAsync(int scenarioId, CreateEdgeDto dto)
     {
-        var graphEdge = new
+        var edge = new
         {
             Id = Guid.NewGuid().ToString(),
-            SourceNodeId = dto.SourceNodeId,
-            TargetNodeId = dto.TargetNodeId,
-            Relationship = dto.Relationship,
-            Operation = dto.Operation,
-            ScenarioId = scenarioId
+            FromParameterNodeId = dto.SourceNodeId,
+            ToParameterNodeId = dto.TargetNodeId,
+            RollupOperator = dto.Operation,
+            Weight = 1.0
         };
 
-        var response = await _httpClient.PostAsJsonAsync($"{_graphApiBaseUrl}/Edges", graphEdge);
+        var response = await _httpClient.PostAsJsonAsync(
+            $"{_graphApiBaseUrl}/Edges/contributes-to", edge);
         response.EnsureSuccessStatusCode();
 
-        var created = await response.Content.ReadFromJsonAsync<EdgeDto>();
-        return created!;
+        // EdgesController returns ContributesToEdge, not EdgeDto — map it
+        var created = await response.Content.ReadFromJsonAsync<ContributesToEdgeResponse>();
+        return new EdgeDto
+        {
+            Id = created!.Id,
+            SourceNodeId = created.FromParameterNodeId,
+            TargetNodeId = created.ToParameterNodeId,
+            Relationship = "CONTRIBUTES_TO",
+            Operation = created.RollupOperator,
+            ScenarioId = scenarioId
+        };
     }
 
+    // Private response shape matching ContributesToEdge from ECT.Graph.Api
+    private sealed class ContributesToEdgeResponse
+    {
+        public string Id { get; init; } = string.Empty;
+        public string FromParameterNodeId { get; init; } = string.Empty;
+        public string ToParameterNodeId { get; init; } = string.Empty;
+        public string RollupOperator { get; init; } = string.Empty;
+        public double Weight { get; init; }
+    }
     public async Task<IEnumerable<EdgeDto>> GetEdgesAsync(int scenarioId)
     {
         var edges = await _httpClient.GetFromJsonAsync<IEnumerable<EdgeDto>>($"{_graphApiBaseUrl}/Edges");

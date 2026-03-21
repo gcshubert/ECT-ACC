@@ -81,3 +81,15 @@ public class UsesEdgeDto
     public string RootParameterNodeId { get; set; } = string.Empty;
     public Dictionary<string, double> BaseParameterValues { get; set; } = new();
 }
+
+/// <summary>
+/// Represents a CONTRIBUTES_TO edge — used to reconstruct parent/child
+/// relationships in the hierarchy tree.
+/// </summary>
+public class ContributesToEdgeSummaryDto
+{
+    public string ChildId { get; set; } = string.Empty;
+    public string ParentId { get; set; } = string.Empty;
+    public double Weight { get; set; }
+    public string? RollupOperator { get; set; }
+}

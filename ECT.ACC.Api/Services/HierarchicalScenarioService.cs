@@ -134,24 +134,31 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
         var uses = await _graph.GetUsesEdgeAsync(scenarioId);
         if (uses is null) return Enumerable.Empty<HierarchicalStepDto>();
 
-        var nodes = new List<HierarchicalStepDto>();
-        foreach (var kv in uses.BaseParameterValues)
+        // Get all parameter nodes for this scenario
+        var allNodes = await _graph.GetParameterNodesAsync(scenarioId);
+
+        // Get all edges to reconstruct parent/child relationships
+        var allEdges = await _graph.GetContributesToEdgesAsync();
+        var parentLookup = allEdges.ToDictionary(e => e.ChildId, e => e.ParentId);
+
+        // Filter out the scenario root — infrastructure, not a user-defined step
+        var rootId = RootNodeId(scenarioId);
+        var stepNodes = allNodes.Where(n => n.Id != rootId).ToList();
+
+        return stepNodes.Select(node => new HierarchicalStepDto
         {
-            var node = await _graph.GetParameterNodeAsync(scenarioId, kv.Key);
-            if (node is null) continue;
-
-            nodes.Add(new HierarchicalStepDto
-            {
-                NodeId = node.Id,
-                Key = node.Id,
-                Label = node.Name,
-                Description = node.Description,
-                Role = node.Role,
-                BaseValue = kv.Value
-            });
-        }
-
-        return nodes;
+            NodeId = node.Id,
+            Key = node.Id,
+            Label = node.Name,
+            Description = node.Description,
+            Role = node.Role,
+            ParentNodeId = parentLookup.TryGetValue(node.Id, out var parentId)
+                              ? (parentId == rootId ? null : parentId)
+                              : null,
+            RollupOperator = allEdges.FirstOrDefault(e => e.ChildId == node.Id)?.RollupOperator,
+            Weight = allEdges.FirstOrDefault(e => e.ChildId == node.Id)?.Weight ?? 1.0,
+            BaseValue = uses.BaseParameterValues.TryGetValue(node.Id, out var val) ? val : null
+        });
     }
 
     public async Task<HierarchicalStepDto?> UpdateStepAsync(int scenarioId, string stepId, UpdateHierarchicalStepDto dto)
@@ -234,5 +241,19 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
             throw new InvalidOperationException($"Scenario graph node not found for scenario {scenarioId}");
 
         return await _graphClient.GetConfigurationWalkTreeAsync(scenarioGraphId, scenarioGraphId);
+    }
+
+    private static void SetBaseValue(Dictionary<string, double> dict, string nodeId, ScientificValueDto value)
+    {
+        dict[$"{nodeId}:coeff"] = value.Coefficient;
+        dict[$"{nodeId}:exp"] = value.Exponent;
+    }
+
+    private static ScientificValueDto? GetBaseValue(Dictionary<string, double> dict, string nodeId)
+    {
+        if (dict.TryGetValue($"{nodeId}:coeff", out var coeff) &&
+            dict.TryGetValue($"{nodeId}:exp", out var exp))
+            return new ScientificValueDto { Coefficient = coeff, Exponent = exp };
+        return null;
     }
 }

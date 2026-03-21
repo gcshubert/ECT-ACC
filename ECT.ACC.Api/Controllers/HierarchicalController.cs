@@ -22,18 +22,43 @@ public class HierarchicalController : ControllerBase
         var steps = await _hierarchyService.GetStepsAsync(scenarioId);
         return Ok(steps);
     }
+
     [HttpPost("hierarchical-steps")]
     public async Task<ActionResult> CreateFullStep(
-    int scenarioId,
-    [FromBody] CreateHierarchicalStepWithParametersDto fullStepDto)
+        int scenarioId,
+        [FromBody] CreateHierarchicalStepWithParametersDto fullStepDto)
     {
         if (fullStepDto.Parameters.Count != 4)
             return BadRequest("A Hierarchical Step must include exactly 4 parameters (E, T, C, k).");
 
-        return Ok();
+        // 1. Create the step anchor node first
+        var stepAnchor = await _hierarchyService.CreateStepAsync(scenarioId, new CreateHierarchicalStepDto
+        {
+            Key = Guid.NewGuid().ToString(),
+            Name = fullStepDto.StepName,
+            Label = fullStepDto.StepName,
+            Description = fullStepDto.Description ?? string.Empty,
+            Role = "k",
+            RollupOperator = "WeightedSum",
+            Weight = 1.0,
+            ParentNodeId = fullStepDto.ParentNodeId
+        });
+
+        // 2. Create the four leaf parameter nodes parented to the step anchor
+        var createdLeaves = new List<HierarchicalStepDto>();
+        foreach (var param in fullStepDto.Parameters)
+        {
+            param.Key = $"{stepAnchor.NodeId}-{param.Role}";
+            param.Name = $"{fullStepDto.StepName} - {param.Role}";
+            param.Label = param.Role;
+            param.ParentNodeId = stepAnchor.NodeId;
+
+            var leaf = await _hierarchyService.CreateStepAsync(scenarioId, param);
+            createdLeaves.Add(leaf);
+        }
+
+        return Ok(new { step = stepAnchor, parameters = createdLeaves });
     }
-
-
 
     [HttpPost("steps")]
     public async Task<ActionResult<HierarchicalStepDto>> CreateStep(int scenarioId, CreateHierarchicalStepDto dto)

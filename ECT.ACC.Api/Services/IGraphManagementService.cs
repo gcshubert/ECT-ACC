@@ -29,4 +29,6 @@ public interface IGraphManagementService
     // Uses edge (base values)
     Task<UsesEdgeDto?> GetUsesEdgeAsync(int scenarioId);
     Task<UsesEdgeDto> UpsertUsesEdgeAsync(int scenarioId, UsesEdgeDto dto);
+
+    Task<IEnumerable<ContributesToEdgeSummaryDto>> GetContributesToEdgesAsync();
 }
