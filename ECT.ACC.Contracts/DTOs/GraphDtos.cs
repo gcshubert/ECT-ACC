@@ -88,6 +88,7 @@ public class UsesEdgeDto
 /// </summary>
 public class ContributesToEdgeSummaryDto
 {
+    public string Id { get; set; } = string.Empty; 
     public string ChildId { get; set; } = string.Empty;
     public string ParentId { get; set; } = string.Empty;
     public double Weight { get; set; }

@@ -115,6 +115,11 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
             });
         }
 
+        // Build parentIds list for DAG support
+        var parentIds = parentId == rootId
+            ? new List<string>()
+            : new List<string> { parentId };
+
         return new HierarchicalStepDto
         {
             NodeId = node.Id,
@@ -122,7 +127,8 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
             Label = node.Name,
             Description = node.Description,
             Role = dto.Role,
-            ParentNodeId = parentId,
+            ParentNodeIds = parentIds,
+            ParentNodeId = parentIds.FirstOrDefault(),
             RollupOperator = dto.RollupOperator,
             Weight = dto.Weight,
             BaseValue = dto.BaseValue
@@ -134,30 +140,36 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
         var uses = await _graph.GetUsesEdgeAsync(scenarioId);
         if (uses is null) return Enumerable.Empty<HierarchicalStepDto>();
 
-        // Get all parameter nodes for this scenario
         var allNodes = await _graph.GetParameterNodesAsync(scenarioId);
-
-        // Get all edges to reconstruct parent/child relationships
         var allEdges = await _graph.GetContributesToEdgesAsync();
-        var parentLookup = allEdges.ToDictionary(e => e.ChildId, e => e.ParentId);
 
-        // Filter out the scenario root — infrastructure, not a user-defined step
+        var parentLookup = allEdges
+            .GroupBy(e => e.ChildId)
+            .ToDictionary(g => g.Key, g => g.Select(e => e.ParentId).ToList());
+
         var rootId = RootNodeId(scenarioId);
         var stepNodes = allNodes.Where(n => n.Id != rootId).ToList();
 
-        return stepNodes.Select(node => new HierarchicalStepDto
+        return stepNodes.Select(node =>
         {
-            NodeId = node.Id,
-            Key = node.Id,
-            Label = node.Name,
-            Description = node.Description,
-            Role = node.Role,
-            ParentNodeId = parentLookup.TryGetValue(node.Id, out var parentId)
-                              ? (parentId == rootId ? null : parentId)
-                              : null,
-            RollupOperator = allEdges.FirstOrDefault(e => e.ChildId == node.Id)?.RollupOperator,
-            Weight = allEdges.FirstOrDefault(e => e.ChildId == node.Id)?.Weight ?? 1.0,
-            BaseValue = uses.BaseParameterValues.TryGetValue(node.Id, out var val) ? val : null
+            // Declared outside the initializer — this was the root cause
+            var parentIds = parentLookup.TryGetValue(node.Id, out var ids)
+                ? ids.Where(id => id != rootId).ToList()
+                : new List<string>();
+
+            return new HierarchicalStepDto
+            {
+                NodeId = node.Id,
+                Key = node.Id,
+                Label = node.Name,
+                Description = node.Description,
+                Role = node.Role,
+                ParentNodeIds = parentIds,
+                ParentNodeId = parentIds.FirstOrDefault(),
+                RollupOperator = allEdges.FirstOrDefault(e => e.ChildId == node.Id)?.RollupOperator,
+                Weight = allEdges.FirstOrDefault(e => e.ChildId == node.Id)?.Weight ?? 1.0,
+                BaseValue = uses.BaseParameterValues.TryGetValue(node.Id, out var val) ? val : null
+            };
         });
     }
 

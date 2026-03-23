@@ -45,6 +45,7 @@ public class CreateHierarchicalStepDto
     /// Parent step node id (if null, attaches to the scenario root node).
     /// </summary>
     public string? ParentNodeId { get; set; }
+    public List<string> ParentNodeIds { get; set; } = new();
 
     /// <summary>
     /// Base value for this step (stored on the USES edge for the scenario).
@@ -103,6 +104,7 @@ public class HierarchicalStepDto
     public string Role { get; set; } = string.Empty;
 
     public string? ParentNodeId { get; set; }
+    public List<string> ParentNodeIds { get; set; } = new();   // ← add this
     public string? RollupOperator { get; set; }
     public double Weight { get; set; } = 1.0;
     public double? BaseValue { get; set; }

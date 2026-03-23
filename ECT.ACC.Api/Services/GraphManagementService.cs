@@ -196,14 +196,29 @@ public class GraphManagementService : IGraphManagementService
 
     public async Task UpdateEdgePropertiesAsync(int scenarioId, string stepId, UpdateEdgeDto dto)
     {
-        // The mediator pattern requires ECT.ACC to forward the request to the Graph.Api
-        // Construct the endpoint targeting the specific edge in the graph
-        var url = $"{_graphApiBaseUrl}/scenarios/{scenarioId}/steps/{stepId}/edge";
+        // 1. Find the existing CONTRIBUTES_TO edge where this node is the child
+        var allEdges = await GetContributesToEdgesAsync();
+        var existing = allEdges.FirstOrDefault(e => e.ChildId == stepId);
 
-        // Forward the DTO containing the hierarchical properties (Weight/Rollup)
-        var response = await _httpClient.PatchAsJsonAsync(url, dto);
+        if (existing is null)
+            throw new InvalidOperationException(
+                $"No CONTRIBUTES_TO edge found for node {stepId} in scenario {scenarioId}.");
 
-        // Validate the mediation was successful
+        // 2. Delete the existing edge
+        await _httpClient.DeleteAsync($"{_graphApiBaseUrl}/Edges/contributes-to/{existing.Id}");
+        // 3. Recreate with updated properties
+        var updated = new
+        {
+            Id = Guid.NewGuid().ToString(),
+            FromParameterNodeId = stepId,
+            ToParameterNodeId = existing.ParentId,
+            RollupOperator = dto.RollupOperator ?? existing.RollupOperator,
+            Weight = dto.Weight ?? existing.Weight
+        };
+
+        var response = await _httpClient.PostAsJsonAsync(
+            $"{_graphApiBaseUrl}/Edges/contributes-to", updated);
+
         response.EnsureSuccessStatusCode();
     }
     public async Task<bool> DeleteEdgeAsync(int scenarioId, string edgeId)
