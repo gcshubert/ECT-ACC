@@ -44,6 +44,7 @@ public class CreateEdgeDto
     public string TargetNodeId { get; set; } = string.Empty;
     public string Relationship { get; set; } = string.Empty; // e.g., "ROLLS_UP_TO", "DEPENDS_ON"
     public string Operation { get; set; } = "Multiply"; // Multiply, Divide, Add, Subtract, Power
+    public int SortOrder { get; set; } = 0;
 }
 
 /// <summary>
@@ -93,4 +94,5 @@ public class ContributesToEdgeSummaryDto
     public string ParentId { get; set; } = string.Empty;
     public double Weight { get; set; }
     public string? RollupOperator { get; set; }
+    public int SortOrder { get; set; } = 0;
 }

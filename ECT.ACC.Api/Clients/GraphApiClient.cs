@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ECT.ACC.Contracts.DTOs;
 using ECT.ACC.Data.Math;
 
 namespace ECT.ACC.Api.Clients;
@@ -64,7 +65,13 @@ public class GraphApiClient : IGraphApiClient
 
         return MapToTreeResult(dto);
     }
-
+    public async Task<IEnumerable<ContributesToEdgeSummaryDto>> GetContributesToEdgesAsync()
+    {
+        var response = await _http.GetAsync("api/Edges/contributes-to");
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IEnumerable<ContributesToEdgeSummaryDto>>(JsonOptions)
+            ?? Enumerable.Empty<ContributesToEdgeSummaryDto>();
+    }
     // -------------------------------------------------------------------------
     // Mapping — graph service DTOs → ECT.ACC domain types
     // -------------------------------------------------------------------------

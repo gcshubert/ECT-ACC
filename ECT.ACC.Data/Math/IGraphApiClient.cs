@@ -1,4 +1,5 @@
 ﻿using ECT.ACC.Data.Math;
+using ECT.ACC.Contracts.DTOs;
 
 namespace ECT.ACC.Data.Math;
 
@@ -23,6 +24,7 @@ public interface IGraphApiClient
     Task<GraphWalkResultTree> GetConfigurationWalkTreeAsync(
         string scenarioGraphId,
         string configurationGraphId);
+    Task<IEnumerable<ContributesToEdgeSummaryDto>> GetContributesToEdgesAsync();
 }
 
 public record GraphWalkResultTree(

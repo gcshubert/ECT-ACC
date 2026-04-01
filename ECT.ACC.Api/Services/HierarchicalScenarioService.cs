@@ -11,7 +11,6 @@ public interface IHierarchicalScenarioService
     Task<IEnumerable<HierarchicalStepDto>> GetStepsAsync(int scenarioId);
     Task<HierarchicalStepDto?> UpdateStepAsync(int scenarioId, string stepId, UpdateHierarchicalStepDto dto);
     Task<bool> DeleteStepAsync(int scenarioId, string stepId);
-
     Task<GraphWalkResultTree> RollupAsync(int scenarioId);
 }
 
@@ -94,12 +93,14 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
         });
 
         var parentId = string.IsNullOrWhiteSpace(dto.ParentNodeId) ? rootId : dto.ParentNodeId;
+        var maxSortOrder = await _graph.GetMaxSortOrderForParentAsync(parentId);
         await _graph.CreateEdgeAsync(scenarioId, new CreateEdgeDto
         {
             SourceNodeId = node.Id,
             TargetNodeId = parentId,
             Relationship = "CONTRIBUTES_TO",
-            Operation = dto.RollupOperator ?? "WeightedSum"
+            Operation = dto.RollupOperator ?? "WeightedSum",
+            SortOrder = maxSortOrder + 1
         });
 
         if (dto.BaseValue.HasValue)

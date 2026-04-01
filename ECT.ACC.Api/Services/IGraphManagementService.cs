@@ -31,4 +31,5 @@ public interface IGraphManagementService
     Task<UsesEdgeDto> UpsertUsesEdgeAsync(int scenarioId, UsesEdgeDto dto);
 
     Task<IEnumerable<ContributesToEdgeSummaryDto>> GetContributesToEdgesAsync();
+    Task<int> GetMaxSortOrderForParentAsync(string parentNodeId);
 }

@@ -258,4 +258,18 @@ public class GraphManagementService : IGraphManagementService
         return await response.Content.ReadFromJsonAsync<UsesEdgeDto>()
             ?? throw new InvalidOperationException("Graph API returned null for UsesEdge.");
     }
+    public async Task<int> GetMaxSortOrderForParentAsync(string parentNodeId)
+    {
+        var response = await _httpClient.GetAsync("api/Edges/contributes-to");
+        response.EnsureSuccessStatusCode();
+        var edges = await response.Content
+            .ReadFromJsonAsync<IEnumerable<ContributesToEdgeSummaryDto>>()
+            ?? Enumerable.Empty<ContributesToEdgeSummaryDto>();
+        var maxOrder = edges
+            .Where(e => e.ParentId == parentNodeId)
+            .Select(e => e.SortOrder)
+            .DefaultIfEmpty(0)
+            .Max();
+        return maxOrder;
+    }
 }
