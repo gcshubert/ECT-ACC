@@ -16,7 +16,7 @@ public class GraphManagementService : IGraphManagementService
     public GraphManagementService(HttpClient httpClient, IConfiguration configuration)
     {
         _httpClient = httpClient;
-        _graphApiBaseUrl = configuration["GraphApi:BaseUrl"] ?? "http://localhost:50068/api";
+        _graphApiBaseUrl = "http://localhost:50069/api";
     }
 
     // ── Scenario node helpers ─────────────────────────────────────────────────

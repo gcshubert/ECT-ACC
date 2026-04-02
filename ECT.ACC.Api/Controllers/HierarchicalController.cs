@@ -84,7 +84,14 @@ public class HierarchicalController : ControllerBase
     [HttpPost("rollup")]
     public async Task<ActionResult<GraphWalkResultTree>> Rollup(int scenarioId)
     {
-        var result = await _hierarchyService.RollupAsync(scenarioId);
-        return Ok(result);
+        try
+        {
+            var result = await _hierarchyService.RollupAsync(scenarioId);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Rollup failed", details = ex.Message, stackTrace = ex.StackTrace });
+        }
     }
 }

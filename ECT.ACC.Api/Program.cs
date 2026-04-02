@@ -37,10 +37,11 @@ builder.Services.AddScoped<IGraphManagementService, GraphManagementService>();
 // ECT.Graph.Api client
 builder.Services.AddHttpClient<IGraphApiClient, GraphApiClient>(client =>
 {
-    client.BaseAddress = new Uri(
-        builder.Configuration["GraphApi:BaseUrl"]
-        ?? throw new InvalidOperationException(
-            "GraphApi:BaseUrl is not configured."));
+    client.BaseAddress = new Uri("http://localhost:50069/");
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    AllowAutoRedirect = false
 });
 
 // HttpClient for GraphManagementService

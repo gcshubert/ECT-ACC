@@ -57,13 +57,23 @@ public class GraphApiClient : IGraphApiClient
         var response = await _http.GetAsync(url);
         response.EnsureSuccessStatusCode();
 
-        var dto = await response.Content
-            .ReadFromJsonAsync<GraphWalkResponseTreeDto>(JsonOptions)
-            ?? throw new InvalidOperationException(
-                $"Graph walk tree returned null for scenario {scenarioGraphId}, " +
-                $"configuration {configurationGraphId}.");
+        try
+        {
+            var dto = await response.Content
+                .ReadFromJsonAsync<GraphWalkResponseTreeDto>(JsonOptions)
+                ?? throw new InvalidOperationException(
+                    $"Graph walk tree returned null for scenario {scenarioGraphId}, " +
+                    $"configuration {configurationGraphId}.");
 
-        return MapToTreeResult(dto);
+            return MapToTreeResult(dto);
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException(
+                $"Failed to deserialize graph walk tree response: {ex.Message}. " +
+                $"Response content: {content}", ex);
+        }
     }
     public async Task<IEnumerable<ContributesToEdgeSummaryDto>> GetContributesToEdgesAsync()
     {
@@ -95,10 +105,10 @@ public class GraphApiClient : IGraphApiClient
         ScenarioNodeId: dto.ScenarioNodeId,
         ConfigurationNodeId: dto.ConfigurationNodeId,
         SolveForMode: dto.SolveForMode,
-        Energy: MapValue(dto.Energy),
-        Control: MapValue(dto.Control),
-        Complexity: MapValue(dto.Complexity),
-        TimeAvailable: MapValue(dto.TimeAvailable),
+        Energy: dto.Energy is null ? new ScientificValue(0, 0) : MapValue(dto.Energy),
+        Control: dto.Control is null ? new ScientificValue(0, 0) : MapValue(dto.Control),
+        Complexity: dto.Complexity is null ? new ScientificValue(0, 0) : MapValue(dto.Complexity),
+        TimeAvailable: dto.TimeAvailable is null ? new ScientificValue(0, 0) : MapValue(dto.TimeAvailable),
         RootResult: MapNodeTree(dto.RootResult),
         RollupValue: dto.RollupValue is null ? null : MapValue(dto.RollupValue),
         ComputedAt: dto.ComputedAt
@@ -154,10 +164,10 @@ public class GraphApiClient : IGraphApiClient
         public string ScenarioNodeId { get; init; } = null!;
         public string? ConfigurationNodeId { get; init; }
         public string SolveForMode { get; init; } = null!;
-        public ScientificValueDto Energy { get; init; } = null!;
-        public ScientificValueDto Control { get; init; } = null!;
-        public ScientificValueDto Complexity { get; init; } = null!;
-        public ScientificValueDto TimeAvailable { get; init; } = null!;
+        public ScientificValueDto? Energy { get; init; }
+        public ScientificValueDto? Control { get; init; }
+        public ScientificValueDto? Complexity { get; init; }
+        public ScientificValueDto? TimeAvailable { get; init; }
         public GraphNodeTreeDto RootResult { get; init; } = null!;
         public ScientificValueDto? RollupValue { get; init; }
         public DateTimeOffset ComputedAt { get; init; }
