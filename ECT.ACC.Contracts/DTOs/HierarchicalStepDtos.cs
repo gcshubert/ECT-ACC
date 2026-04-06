@@ -50,7 +50,7 @@ public class CreateHierarchicalStepDto
     /// <summary>
     /// Base value for this step (stored on the USES edge for the scenario).
     /// </summary>
-    public double? BaseValue { get; set; }
+    public ScientificValueDto? BaseValue { get; set; }
 }
 
 public class UpdateHierarchicalStepDto
@@ -86,7 +86,7 @@ public class UpdateHierarchicalStepDto
     /// <summary>
     /// Updated base numeric value for the scenario calculation.
     /// </summary>
-    public double? BaseValue { get; set; }
+    public ScientificValueDto? BaseValue { get; set; }
 }
 public class HierarchicalStepDto
 {
@@ -107,5 +107,5 @@ public class HierarchicalStepDto
     public List<string> ParentNodeIds { get; set; } = new();   // ← add this
     public string? RollupOperator { get; set; }
     public double Weight { get; set; } = 1.0;
-    public double? BaseValue { get; set; }
+    public ScientificValueDto? BaseValue { get; set; }
 }

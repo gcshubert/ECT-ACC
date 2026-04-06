@@ -25,6 +25,7 @@ public interface IGraphApiClient
         string scenarioGraphId,
         string configurationGraphId);
     Task<IEnumerable<ContributesToEdgeSummaryDto>> GetContributesToEdgesAsync();
+    Task<bool> DeleteStepWithLeavesAsync(string anchorId);
 }
 
 public record GraphWalkResultTree(

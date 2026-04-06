@@ -174,6 +174,21 @@ public class GraphManagementService : IGraphManagementService
         public string RollupOperator { get; init; } = string.Empty;
         public double Weight { get; init; }
     }
+
+    private sealed class UsesEdge
+    {
+        public string Id { get; init; } = string.Empty;
+        public string ScenarioNodeId { get; init; } = string.Empty;
+        public string RootParameterNodeId { get; init; } = string.Empty;
+        public Dictionary<string, ScientificValueResponse> BaseParameterValues { get; init; } = new();
+    }
+
+    private sealed class ScientificValueResponse
+    {
+        public double Coefficient { get; init; }
+        public double Exponent { get; init; }
+    }
+
     public async Task<IEnumerable<EdgeDto>> GetEdgesAsync(int scenarioId)
     {
         var edges = await _httpClient.GetFromJsonAsync<IEnumerable<EdgeDto>>($"{_graphApiBaseUrl}/Edges");
@@ -234,8 +249,21 @@ public class GraphManagementService : IGraphManagementService
 
         var response = await _httpClient.GetAsync($"{_graphApiBaseUrl}/Edges/uses/by-scenario/{scenarioGraphId}");
         if (!response.IsSuccessStatusCode) return null;
-        return await response.Content.ReadFromJsonAsync<UsesEdgeDto>()
-            ?? throw new InvalidOperationException("Graph API returned null for UsesEdge.");
+
+        var result = await response.Content.ReadFromJsonAsync<UsesEdge>();
+        if (result == null) throw new InvalidOperationException("Graph API returned null for UsesEdge.");
+
+        // Convert to UsesEdgeDto
+        return new UsesEdgeDto
+        {
+            Id = result.Id,
+            ScenarioNodeId = result.ScenarioNodeId,
+            RootParameterNodeId = result.RootParameterNodeId,
+            BaseParameterValues = result.BaseParameterValues.ToDictionary(
+                kvp => kvp.Key,
+                kvp => new ScientificValueDto { Coefficient = kvp.Value.Coefficient, Exponent = kvp.Value.Exponent }
+            )
+        };
     }
 
     public async Task<UsesEdgeDto> UpsertUsesEdgeAsync(int scenarioId, UsesEdgeDto dto)
@@ -246,21 +274,41 @@ public class GraphManagementService : IGraphManagementService
             throw new InvalidOperationException($"Scenario graph node not found for scenario {scenarioId}");
         }
 
+        // Convert ScientificValueDto to ScientificValue for Graph API
+        var baseValues = dto.BaseParameterValues.ToDictionary(
+            kvp => kvp.Key,
+            kvp => new { Coefficient = kvp.Value.Coefficient, Exponent = kvp.Value.Exponent }
+        );
         var payload = new
         {
             RootParameterNodeId = dto.RootParameterNodeId,
-            BaseParameterValues = dto.BaseParameterValues
+            BaseParameterValues = baseValues
         };
 
         var response = await _httpClient.PutAsJsonAsync($"{_graphApiBaseUrl}/Edges/uses/{scenarioGraphId}", payload);
         response.EnsureSuccessStatusCode();
 
-        return await response.Content.ReadFromJsonAsync<UsesEdgeDto>()
-            ?? throw new InvalidOperationException("Graph API returned null for UsesEdge.");
+        // The response is UsesEdge, but we need to convert back to UsesEdgeDto
+        var result = await response.Content.ReadFromJsonAsync<UsesEdge>();
+        if (result == null) throw new InvalidOperationException("Graph API returned null for UsesEdge.");
+
+        // Convert back to UsesEdgeDto
+        var resultDto = new UsesEdgeDto
+        {
+            Id = result.Id,
+            ScenarioNodeId = result.ScenarioNodeId,
+            RootParameterNodeId = result.RootParameterNodeId,
+            BaseParameterValues = result.BaseParameterValues.ToDictionary(
+                kvp => kvp.Key,
+                kvp => new ScientificValueDto { Coefficient = kvp.Value.Coefficient, Exponent = kvp.Value.Exponent }
+            )
+        };
+
+        return resultDto;
     }
     public async Task<int> GetMaxSortOrderForParentAsync(string parentNodeId)
     {
-        var response = await _httpClient.GetAsync("api/Edges/contributes-to");
+        var response = await _httpClient.GetAsync($"{_graphApiBaseUrl}/Edges/contributes-to");
         response.EnsureSuccessStatusCode();
         var edges = await response.Content
             .ReadFromJsonAsync<IEnumerable<ContributesToEdgeSummaryDto>>()

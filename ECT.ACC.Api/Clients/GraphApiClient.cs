@@ -82,6 +82,12 @@ public class GraphApiClient : IGraphApiClient
         return await response.Content.ReadFromJsonAsync<IEnumerable<ContributesToEdgeSummaryDto>>(JsonOptions)
             ?? Enumerable.Empty<ContributesToEdgeSummaryDto>();
     }
+
+    public async Task<bool> DeleteStepWithLeavesAsync(string anchorId)
+    {
+        var response = await _http.DeleteAsync($"api/ParameterNodes/{anchorId}/with-leaves");
+        return response.IsSuccessStatusCode;
+    }
     // -------------------------------------------------------------------------
     // Mapping — graph service DTOs → ECT.ACC domain types
     // -------------------------------------------------------------------------

@@ -45,7 +45,10 @@ builder.Services.AddHttpClient<IGraphApiClient, GraphApiClient>(client =>
 });
 
 // HttpClient for GraphManagementService
-builder.Services.AddHttpClient<GraphManagementService>();
+builder.Services.AddHttpClient<GraphManagementService>(client =>
+{
+    client.BaseAddress = new Uri("http://localhost:50069/");
+});
 
 var app = builder.Build();
 

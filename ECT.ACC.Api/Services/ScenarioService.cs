@@ -102,16 +102,16 @@ public class ScenarioService :IScenarioService
         return MapToDto(scenario);
     }
 
-    private static Dictionary<string, double> MapToGraphValues(ScenarioParameters? p)
+    private static Dictionary<string, ScientificValueDto> MapToGraphValues(ScenarioParameters? p)
     {
-        if (p == null) return new Dictionary<string, double>();
+        if (p == null) return new Dictionary<string, ScientificValueDto>();
 
-        return new Dictionary<string, double>
+        return new Dictionary<string, ScientificValueDto>
             {
-                { "E_coeff", p.Energy.Coefficient }, { "E_exp", p.Energy.Exponent },
-                { "T_coeff", p.TimeAvailable.Coefficient }, { "T_exp", p.TimeAvailable.Exponent },
-                { "C_coeff", p.Complexity.Coefficient }, { "C_exp", p.Complexity.Exponent },
-                { "k_coeff", p.Control.Coefficient }, { "k_exp", p.Control.Exponent }
+                { "E", new ScientificValueDto { Coefficient = p.Energy.Coefficient, Exponent = p.Energy.Exponent } },
+                { "T", new ScientificValueDto { Coefficient = p.TimeAvailable.Coefficient, Exponent = p.TimeAvailable.Exponent } },
+                { "C", new ScientificValueDto { Coefficient = p.Complexity.Coefficient, Exponent = p.Complexity.Exponent } },
+                { "k", new ScientificValueDto { Coefficient = p.Control.Coefficient, Exponent = p.Control.Exponent } }
             };
     }
 

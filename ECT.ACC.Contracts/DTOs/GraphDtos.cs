@@ -80,7 +80,7 @@ public class UsesEdgeDto
     public string Id { get; set; } = string.Empty;
     public string ScenarioNodeId { get; set; } = string.Empty;
     public string RootParameterNodeId { get; set; } = string.Empty;
-    public Dictionary<string, double> BaseParameterValues { get; set; } = new();
+    public Dictionary<string, ScientificValueDto> BaseParameterValues { get; set; } = new();
 }
 
 /// <summary>
