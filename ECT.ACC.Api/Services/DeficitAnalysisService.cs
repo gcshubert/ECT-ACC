@@ -76,10 +76,32 @@ public class DeficitAnalysisService : IDeficitAnalysisService
         ScientificValue complexity,
         ScientificValue timeAvailable)
     {
+        // Safety check for invalid input values
+        if (double.IsNaN(energy.Coefficient) || double.IsInfinity(energy.Coefficient) ||
+            double.IsNaN(energy.Exponent) || double.IsInfinity(energy.Exponent) ||
+            double.IsNaN(control.Coefficient) || double.IsInfinity(control.Coefficient) ||
+            double.IsNaN(control.Exponent) || double.IsInfinity(control.Exponent) ||
+            double.IsNaN(complexity.Coefficient) || double.IsInfinity(complexity.Coefficient) ||
+            double.IsNaN(complexity.Exponent) || double.IsInfinity(complexity.Exponent) ||
+            double.IsNaN(timeAvailable.Coefficient) || double.IsInfinity(timeAvailable.Coefficient) ||
+            double.IsNaN(timeAvailable.Exponent) || double.IsInfinity(timeAvailable.Exponent))
+        {
+            throw new InvalidOperationException($"Invalid input values for deficit analysis. Energy: {energy.Coefficient}e{energy.Exponent}, Control: {control.Coefficient}e{control.Exponent}, Complexity: {complexity.Coefficient}e{complexity.Exponent}, Time: {timeAvailable.Coefficient}e{timeAvailable.Exponent}");
+        }
+
         var cRequired = ECTMath.SolveForC(complexity, energy, timeAvailable);
         var cAvailable = control;
         var cDeficit = ECTMath.ComputeDeficit(cRequired, cAvailable);
         var deficitType = ECTMath.ClassifyDeficit(cDeficit, "C", "Manufacturing");
+
+        // Safety check for computed values
+        if (double.IsNaN(cRequired.Coefficient) || double.IsInfinity(cRequired.Coefficient) ||
+            double.IsNaN(cRequired.Exponent) || double.IsInfinity(cRequired.Exponent) ||
+            double.IsNaN(cDeficit.Coefficient) || double.IsInfinity(cDeficit.Coefficient) ||
+            double.IsNaN(cDeficit.Exponent) || double.IsInfinity(cDeficit.Exponent))
+        {
+            throw new InvalidOperationException($"Invalid computed values for deficit analysis. CRequired: {cRequired.Coefficient}e{cRequired.Exponent}, CDeficit: {cDeficit.Coefficient}e{cDeficit.Exponent}");
+        }
 
         var existing = await _context.DeficitAnalyses
             .FirstOrDefaultAsync(d => d.ScenarioId == scenarioId

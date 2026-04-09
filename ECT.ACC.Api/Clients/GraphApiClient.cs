@@ -30,6 +30,32 @@ public class GraphApiClient : IGraphApiClient
         _http = http;
     }
 
+    // GraphApiClient.cs — add this method
+    public async Task<GraphWalkResultTree> GetScenarioWalkTreeAsync(string scenarioGraphId)
+    {
+        var url = $"api/walk/scenario/{scenarioGraphId}";
+
+        var response = await _http.GetAsync(url);
+        response.EnsureSuccessStatusCode();
+
+        try
+        {
+            var dto = await response.Content
+                .ReadFromJsonAsync<GraphWalkResponseTreeDto>(JsonOptions)
+                ?? throw new InvalidOperationException(
+                    $"Graph walk tree returned null for scenario {scenarioGraphId}.");
+
+            return MapToTreeResult(dto);
+        }
+        catch (JsonException ex)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException(
+                $"Failed to deserialize graph walk tree response: {ex.Message}. " +
+                $"Response content: {content}", ex);
+        }
+    }
+
     public async Task<GraphWalkResult> GetConfigurationWalkAsync(
         string scenarioGraphId,
         string configurationGraphId)

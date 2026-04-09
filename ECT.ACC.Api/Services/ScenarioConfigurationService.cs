@@ -14,7 +14,11 @@ public interface IScenarioConfigurationService
     Task<ScenarioConfigurationDto?>      UpdateConfigurationAsync(int scenarioId, int configId, UpdateScenarioConfigurationRequest request);
     Task<ScenarioConfigurationDto?>      UpdateEntryAsync(int scenarioId, int configId, string paramKey, UpdateConfigurationEntryRequest request);
     Task<ScenarioConfigurationDto?>      ActivateConfigurationAsync(int scenarioId, int configId, IDeficitAnalysisService deficitService);
+    Task<DeficitAnalysisDto?>            ComputeDeficitAnalysisAsync(int scenarioId, int configId, IDeficitAnalysisService deficitService);
+    Task                                EnsureDefaultConfigurationAsync(Scenario scenario, IDeficitAnalysisService deficitService);
     Task<bool>                           DeleteConfigurationAsync(int scenarioId, int configId);
+    Task                                WriteHierarchicalSnapshotAsync(int scenarioId, int configId, GraphWalkResultTree walkResult);
+    Task<DeficitAnalysisDto?>            ComputeHierarchicalDeficitAnalysisAsync(int scenarioId, int configId, GraphWalkResultTree rollupResult, IDeficitAnalysisService deficitService);
 }
 
 public class ScenarioConfigurationService : IScenarioConfigurationService
@@ -97,6 +101,39 @@ public class ScenarioConfigurationService : IScenarioConfigurationService
 
         return MapToDto(config);
     }
+
+    public async Task EnsureDefaultConfigurationAsync(
+    Scenario scenario,
+    IDeficitAnalysisService deficitService)
+    {
+        // Flat → "Base"
+        // Hierarchical → "H - Rollup"
+        var configName = scenario.ScenarioMode == "Hierarchical"
+            ? "H - Rollup"
+            : "Base";
+
+        // If it already exists, nothing to do
+        var exists = await _db.ScenarioConfigurations
+            .AnyAsync(c => c.ScenarioId == scenario.Id && c.Name == configName);
+
+        if (exists) return;
+
+        // Create a new configuration using the existing creation pipeline
+        var created = await CreateConfigurationAsync(
+            scenario.Id,
+            new CreateScenarioConfigurationRequest
+            {
+                Name = configName,
+                Description = string.Empty
+            });
+
+        // Activate it so snapshot values are computed (deficit analysis handled separately)
+        await ActivateConfigurationAsync(
+            scenario.Id,
+            created.Id,
+            deficitService);
+    }
+
 
     // ── UPDATE name / description / sortOrder ────────────────────────────────
 
@@ -205,7 +242,90 @@ public class ScenarioConfigurationService : IScenarioConfigurationService
 
         await _db.SaveChangesAsync();
 
-        // 3. Extract the four core ECT parameter snapshot values
+        // 3. Reload to get fresh navigation properties
+        var refreshed = await LoadConfigAsync(scenarioId, configId);
+        return refreshed is null ? null : MapToDto(refreshed);
+    }
+
+    public async Task WriteHierarchicalSnapshotAsync(
+        int scenarioId, int configId, GraphWalkResultTree walkResult)
+    {
+        var config = await LoadConfigAsync(scenarioId, configId);
+        if (config is null)
+            throw new InvalidOperationException(
+                $"Configuration {configId} not found for scenario {scenarioId}");
+
+        // Create entries without snapshot values first
+        var parameters = new[] { "e", "c", "k", "t" };
+        var values = new[] { walkResult.Energy, walkResult.Control, walkResult.Complexity, walkResult.TimeAvailable };
+
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            var key = parameters[i];
+            var value = values[i];
+            
+            if (value is null) continue;
+            
+            // Safety check for valid values
+            if (double.IsNaN(value.Coefficient) || double.IsInfinity(value.Coefficient) ||
+                double.IsNaN(value.Exponent) || double.IsInfinity(value.Exponent))
+            {
+                continue;
+            }
+
+            var entry = config.Entries.FirstOrDefault(
+                e => string.Equals(e.ParameterKey, key, StringComparison.OrdinalIgnoreCase));
+                
+            if (entry is null)
+            {
+                entry = new ScenarioConfigurationEntry
+                {
+                    ConfigurationId = configId,
+                    ParameterKey = key,
+                    VariantId = null,
+                    VariantLabel = "Hierarchical Rollup"
+                };
+                config.Entries.Add(entry);
+            }
+
+            // Set snapshot value
+            entry.SnapshotValue = new ScientificValueOwned
+            {
+                Coefficient = value.Coefficient,
+                Exponent = value.Exponent,
+            };
+        }
+
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task<DeficitAnalysisDto?> ComputeHierarchicalDeficitAnalysisAsync(
+        int scenarioId, int configId, GraphWalkResultTree rollupResult, IDeficitAnalysisService deficitService)
+    {
+        // Use the rollup result values directly instead of reading from database
+        var energy = rollupResult.Energy;
+        var control = rollupResult.Control;
+        var complexity = rollupResult.Complexity;
+        var timeAvailable = rollupResult.TimeAvailable;
+
+        // Compute deficit from rollup values, tied directly to this configuration
+        await deficitService.ComputeAndSaveFromRollupAsync(
+            scenarioId, configId, energy, control, complexity, timeAvailable);
+
+        // Reload to get fresh navigation properties including deficit analysis
+        var refreshed = await LoadConfigAsync(scenarioId, configId);
+        return refreshed?.DeficitAnalysis is null ? null : MapDeficit(refreshed.DeficitAnalysis);
+    }
+
+    // ---- COMPUTE DEFICIT ANALYSIS ----
+
+    public async Task<DeficitAnalysisDto?> ComputeDeficitAnalysisAsync(
+        int scenarioId, int configId, IDeficitAnalysisService deficitService)
+    {
+        var config = await LoadConfigAsync(scenarioId, configId);
+        if (config is null) return null;
+
+        // Extract the four core ECT parameter snapshot values
         ScientificValue Snap(string key)
         {
             var entry = config.Entries.FirstOrDefault(
@@ -224,13 +344,13 @@ public class ScenarioConfigurationService : IScenarioConfigurationService
         var complexity   = Snap("k");
         var timeAvailable = Snap("t");
 
-        // 4. Compute deficit from rollup values, tied directly to this configuration
+        // Compute deficit from rollup values, tied directly to this configuration
         await deficitService.ComputeAndSaveFromRollupAsync(
             scenarioId, configId, energy, control, complexity, timeAvailable);
 
-        // 5. Reload to get fresh navigation properties
+        // Reload to get fresh navigation properties including deficit analysis
         var refreshed = await LoadConfigAsync(scenarioId, configId);
-        return refreshed is null ? null : MapToDto(refreshed);
+        return refreshed?.DeficitAnalysis is null ? null : MapDeficit(refreshed.DeficitAnalysis);
     }
 
     // ── DELETE ───────────────────────────────────────────────────────────────

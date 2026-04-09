@@ -267,11 +267,11 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
     {
         var scenarioGraphId = await _graph.GetScenarioGraphIdAsync(scenarioId);
         if (scenarioGraphId is null)
-            throw new InvalidOperationException($"Scenario graph node not found for scenario {scenarioId}");
+            throw new InvalidOperationException(
+                $"Scenario graph node not found for scenario {scenarioId}");
 
-        return await _graphClient.GetConfigurationWalkTreeAsync(scenarioGraphId, scenarioGraphId);
+        return await _graphClient.GetScenarioWalkTreeAsync(scenarioGraphId);
     }
-
     private static void SetBaseValue(Dictionary<string, double> dict, string nodeId, ScientificValueDto value)
     {
         dict[$"{nodeId}:coeff"] = value.Coefficient;
