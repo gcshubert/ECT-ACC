@@ -68,7 +68,24 @@ public class GraphManagementService : IGraphManagementService
             Role = dto.Role,
             RollupOperator = dto.RollupOperator ?? string.Empty,
             Description = dto.Description,
-            IsActive = dto.IsActive
+            IsActive = dto.IsActive,
+            Coefficient = dto.ScientificValue?.Coefficient,
+            Exponent = dto.ScientificValue?.Exponent,
+            Provenance = dto.ScientificValue?.Provenance,
+            ExternalScenarioId = scenarioId.ToString(),
+            // Parameter values stored directly on step anchor nodes (Apr 2026)
+            ECoefficient = dto.E?.Coefficient,
+            EExponent = dto.E?.Exponent,
+            CCoefficient = dto.C?.Coefficient,
+            CExponent = dto.C?.Exponent,
+            KCoefficient = dto.K?.Coefficient,
+            KExponent = dto.K?.Exponent,
+            TCoefficient = dto.T?.Coefficient,
+            TExponent = dto.T?.Exponent,
+            EProvenance = (string?)null,
+            CProvenance = (string?)null,
+            KProvenance = (string?)null,
+            TProvenance = (string?)null
         };
 
         var response = await _httpClient.PostAsJsonAsync($"{_graphApiBaseUrl}/ParameterNodes", graphNode);
@@ -114,15 +131,105 @@ public class GraphManagementService : IGraphManagementService
         return edges ?? Enumerable.Empty<ContributesToEdgeSummaryDto>();
     }
 
+    public async Task<IEnumerable<ContributesToEdgeSummaryDto>> GetAllContributesToEdgesAsync()
+    {
+        var response = await _httpClient.GetAsync($"{_graphApiBaseUrl}/Edges/contributes-to");
+        if (!response.IsSuccessStatusCode) return Enumerable.Empty<ContributesToEdgeSummaryDto>();
+
+        var edges = await response.Content
+            .ReadFromJsonAsync<IEnumerable<ContributesToEdgeSummaryDto>>(new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+        return edges ?? Enumerable.Empty<ContributesToEdgeSummaryDto>();
+    }
+
+    public async Task<IEnumerable<ParameterNodeDto>> GetAllNodesForScenarioAsync(int scenarioId)
+    {
+        var response = await _httpClient.GetAsync($"{_graphApiBaseUrl}/ParameterNodes/by-scenario/{scenarioId}");
+        if (!response.IsSuccessStatusCode) return Enumerable.Empty<ParameterNodeDto>();
+
+        var nodes = await response.Content
+            .ReadFromJsonAsync<IEnumerable<ParameterNodeDto>>(new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter() }
+            });
+
+        return nodes ?? Enumerable.Empty<ParameterNodeDto>();
+    }
+
+    public async Task<IEnumerable<ParameterNodeDto>> GetParameterNodesByScenarioRootAsync(int scenarioId)
+    {
+        var response = await _httpClient.GetAsync($"{_graphApiBaseUrl}/ParameterNodes/by-scenario/{scenarioId}");
+        if (!response.IsSuccessStatusCode) return Enumerable.Empty<ParameterNodeDto>();
+
+        var nodes = await response.Content
+            .ReadFromJsonAsync<IEnumerable<ParameterNodeDto>>(new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter() }
+            });
+
+        return nodes ?? Enumerable.Empty<ParameterNodeDto>();
+    }
+
+    public async Task<IEnumerable<ContributesToEdgeSummaryDto>> GetContributesToEdgesByScenarioRootAsync(int scenarioId)
+    {
+        var response = await _httpClient.GetAsync($"{_graphApiBaseUrl}/Edges/contributes-to/by-scenario/{scenarioId}");
+        if (!response.IsSuccessStatusCode) return Enumerable.Empty<ContributesToEdgeSummaryDto>();
+
+        var edges = await response.Content
+            .ReadFromJsonAsync<IEnumerable<ContributesToEdgeSummaryDto>>(new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+        return edges ?? Enumerable.Empty<ContributesToEdgeSummaryDto>();
+    }
+
+    public async Task<IEnumerable<ContributesToEdgeSummaryDto>> GetContributesToEdgesByScenarioAsync(int scenarioId)
+    {
+        var response = await _httpClient.GetAsync($"{_graphApiBaseUrl}/Edges/contributes-to/by-scenario/{scenarioId}");
+        if (!response.IsSuccessStatusCode) return Enumerable.Empty<ContributesToEdgeSummaryDto>();
+
+        var edges = await response.Content
+            .ReadFromJsonAsync<IEnumerable<ContributesToEdgeSummaryDto>>(new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+        return edges ?? Enumerable.Empty<ContributesToEdgeSummaryDto>();
+    }
+
     public async Task<ParameterNodeDto?> UpdateParameterNodeAsync(int scenarioId, string nodeId, UpdateParameterNodeDto dto)
     {
         var updatePayload = new
         {
+            Id = nodeId,
             Name = dto.Name,
             Role = dto.Role,
-            RollupOperator = dto.RollupOperator ?? string.Empty,
+            RollupOperator = dto.RollupOperator,
             Description = dto.Description,
-            IsActive = dto.IsActive
+            IsActive = dto.IsActive,
+            Coefficient = dto.ScientificValue?.Coefficient,
+            Exponent = dto.ScientificValue?.Exponent,
+            Provenance = dto.ScientificValue?.Provenance,
+            ExternalScenarioId = scenarioId.ToString(),
+            // Parameter values stored directly on step anchor nodes (Apr 2026)
+            ECoefficient = dto.E?.Coefficient,
+            EExponent = dto.E?.Exponent,
+            CCoefficient = dto.C?.Coefficient,
+            CExponent = dto.C?.Exponent,
+            KCoefficient = dto.K?.Coefficient,
+            KExponent = dto.K?.Exponent,
+            TCoefficient = dto.T?.Coefficient,
+            TExponent = dto.T?.Exponent,
+            EProvenance = (string?)null,
+            CProvenance = (string?)null,
+            KProvenance = (string?)null,
+            TProvenance = (string?)null
         };
 
         var response = await _httpClient.PutAsJsonAsync($"{_graphApiBaseUrl}/ParameterNodes/{nodeId}", updatePayload);
@@ -134,6 +241,15 @@ public class GraphManagementService : IGraphManagementService
     public async Task<bool> DeleteParameterNodeAsync(int scenarioId, string nodeId)
     {
         var response = await _httpClient.DeleteAsync($"{_graphApiBaseUrl}/ParameterNodes/{nodeId}");
+        return response.IsSuccessStatusCode;
+    }
+
+    /// <summary>
+    /// Deletes all parameter nodes for a scenario (clears the deck).
+    /// </summary>
+    public async Task<bool> DeleteAllParameterNodesForScenarioAsync(int scenarioId)
+    {
+        var response = await _httpClient.DeleteAsync($"{_graphApiBaseUrl}/ParameterNodes/scenario/{scenarioId}");
         return response.IsSuccessStatusCode;
     }
 
@@ -152,7 +268,6 @@ public class GraphManagementService : IGraphManagementService
             $"{_graphApiBaseUrl}/Edges/contributes-to", edge);
         response.EnsureSuccessStatusCode();
 
-        // EdgesController returns ContributesToEdge, not EdgeDto — map it
         var created = await response.Content.ReadFromJsonAsync<ContributesToEdgeResponse>();
         return new EdgeDto
         {
@@ -211,7 +326,6 @@ public class GraphManagementService : IGraphManagementService
 
     public async Task UpdateEdgePropertiesAsync(int scenarioId, string stepId, UpdateEdgeDto dto)
     {
-        // 1. Find the existing CONTRIBUTES_TO edge where this node is the child
         var allEdges = await GetContributesToEdgesAsync();
         var existing = allEdges.FirstOrDefault(e => e.ChildId == stepId);
 
@@ -219,9 +333,8 @@ public class GraphManagementService : IGraphManagementService
             throw new InvalidOperationException(
                 $"No CONTRIBUTES_TO edge found for node {stepId} in scenario {scenarioId}.");
 
-        // 2. Delete the existing edge
         await _httpClient.DeleteAsync($"{_graphApiBaseUrl}/Edges/contributes-to/{existing.Id}");
-        // 3. Recreate with updated properties
+
         var updated = new
         {
             Id = Guid.NewGuid().ToString(),
@@ -236,6 +349,7 @@ public class GraphManagementService : IGraphManagementService
 
         response.EnsureSuccessStatusCode();
     }
+
     public async Task<bool> DeleteEdgeAsync(int scenarioId, string edgeId)
     {
         var response = await _httpClient.DeleteAsync($"{_graphApiBaseUrl}/Edges/{edgeId}");
@@ -253,7 +367,6 @@ public class GraphManagementService : IGraphManagementService
         var result = await response.Content.ReadFromJsonAsync<UsesEdge>();
         if (result == null) throw new InvalidOperationException("Graph API returned null for UsesEdge.");
 
-        // Convert to UsesEdgeDto
         return new UsesEdgeDto
         {
             Id = result.Id,
@@ -270,11 +383,8 @@ public class GraphManagementService : IGraphManagementService
     {
         var scenarioGraphId = await GetScenarioGraphIdAsync(scenarioId);
         if (scenarioGraphId is null)
-        {
             throw new InvalidOperationException($"Scenario graph node not found for scenario {scenarioId}");
-        }
 
-        // Convert ScientificValueDto to ScientificValue for Graph API
         var baseValues = dto.BaseParameterValues.ToDictionary(
             kvp => kvp.Key,
             kvp => new { Coefficient = kvp.Value.Coefficient, Exponent = kvp.Value.Exponent }
@@ -288,12 +398,10 @@ public class GraphManagementService : IGraphManagementService
         var response = await _httpClient.PutAsJsonAsync($"{_graphApiBaseUrl}/Edges/uses/{scenarioGraphId}", payload);
         response.EnsureSuccessStatusCode();
 
-        // The response is UsesEdge, but we need to convert back to UsesEdgeDto
         var result = await response.Content.ReadFromJsonAsync<UsesEdge>();
         if (result == null) throw new InvalidOperationException("Graph API returned null for UsesEdge.");
 
-        // Convert back to UsesEdgeDto
-        var resultDto = new UsesEdgeDto
+        return new UsesEdgeDto
         {
             Id = result.Id,
             ScenarioNodeId = result.ScenarioNodeId,
@@ -303,9 +411,8 @@ public class GraphManagementService : IGraphManagementService
                 kvp => new ScientificValueDto { Coefficient = kvp.Value.Coefficient, Exponent = kvp.Value.Exponent }
             )
         };
-
-        return resultDto;
     }
+
     public async Task<int> GetMaxSortOrderForParentAsync(string parentNodeId)
     {
         var response = await _httpClient.GetAsync($"{_graphApiBaseUrl}/Edges/contributes-to");

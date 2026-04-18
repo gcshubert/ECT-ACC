@@ -68,7 +68,17 @@ app.UseCors("ReactClient");
 app.UseAuthorization();
 
 
-app.MapControllers();
+try
+{
+    app.MapControllers();
+    Console.WriteLine("Controllers mapped successfully.");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Error mapping controllers: {ex.Message}");
+    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+    throw;
+}
 
 // Seed domain + template data
 await using var scope = app.Services.CreateAsyncScope();

@@ -35,7 +35,7 @@ public class GraphController : ControllerBase
     [HttpGet("scenario/{scenarioId}/nodes")]
     public async Task<ActionResult<IEnumerable<ParameterNodeDto>>> GetNodes(int scenarioId)
     {
-        var nodes = await _graphService.GetParameterNodesAsync(scenarioId);
+        var nodes = await _graphService.GetParameterNodesByScenarioRootAsync(scenarioId);
         return Ok(nodes);
     }
 

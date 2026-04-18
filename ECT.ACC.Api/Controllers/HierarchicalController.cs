@@ -6,33 +6,41 @@ using Microsoft.AspNetCore.Mvc;
 namespace ECT.ACC.Api.Controllers;
 
 [ApiController]
-[Route("api/scenarios/{scenarioId}/hierarchy")]
+[Route("api/scenarios/{sid}/hierarchy")]
 public class HierarchicalController : ControllerBase
 {
     private readonly IHierarchicalScenarioService _hierarchyService;
+    private readonly IGraphManagementService _graph;
 
-    public HierarchicalController(IHierarchicalScenarioService hierarchyService)
+    public HierarchicalController(IHierarchicalScenarioService hierarchyService, IGraphManagementService graph)
     {
         _hierarchyService = hierarchyService;
+        _graph = graph;
     }
 
     [HttpGet("steps")]
-    public async Task<ActionResult<IEnumerable<HierarchicalStepDto>>> GetSteps(int scenarioId)
+    public async Task<ActionResult<IEnumerable<HierarchicalStepDto>>> GetSteps([FromRoute] int sid)
     {
-        var steps = await _hierarchyService.GetStepsAsync(scenarioId);
+        var steps = await _hierarchyService.GetStepsAsync(sid);
         return Ok(steps);
     }
 
     [HttpPost("hierarchical-steps")]
     public async Task<ActionResult> CreateFullStep(
-        int scenarioId,
+        [FromRoute] int sid,
         [FromBody] CreateHierarchicalStepWithParametersDto fullStepDto)
     {
         if (fullStepDto.Parameters.Count != 4)
             return BadRequest("A Hierarchical Step must include exactly 4 parameters (E, T, C, k).");
 
-        // 1. Create the step anchor node first
-        var stepAnchor = await _hierarchyService.CreateStepAsync(scenarioId, new CreateHierarchicalStepDto
+        // Extract parameter values from the request
+        var eParam = fullStepDto.Parameters.FirstOrDefault(p => p.Role == "E");
+        var tParam = fullStepDto.Parameters.FirstOrDefault(p => p.Role == "T");
+        var cParam = fullStepDto.Parameters.FirstOrDefault(p => p.Role == "C");
+        var kParam = fullStepDto.Parameters.FirstOrDefault(p => p.Role == "k");
+
+        // Create step anchor with parameters stored as properties
+        var stepAnchor = await _hierarchyService.CreateStepAsync(sid, new CreateHierarchicalStepDto
         {
             Key = Guid.NewGuid().ToString(),
             Name = fullStepDto.StepName,
@@ -41,52 +49,54 @@ public class HierarchicalController : ControllerBase
             Role = "k",
             RollupOperator = "WeightedSum",
             Weight = 1.0,
-            ParentNodeId = fullStepDto.ParentNodeId
+            ParentNodeId = fullStepDto.ParentNodeId,
+            // Store parameters directly on the step anchor
+            E = eParam?.BaseValue,
+            C = cParam?.BaseValue,
+            K = kParam?.BaseValue,
+            T = tParam?.BaseValue
         });
 
-        // 2. Create the four leaf parameter nodes parented to the step anchor
-        var createdLeaves = new List<HierarchicalStepDto>();
-        foreach (var param in fullStepDto.Parameters)
-        {
-            param.Key = $"{stepAnchor.NodeId}-{param.Role}";
-            param.Name = $"{fullStepDto.StepName} - {param.Role}";
-            param.Label = param.Role;
-            param.ParentNodeId = stepAnchor.NodeId;
-
-            var leaf = await _hierarchyService.CreateStepAsync(scenarioId, param);
-            createdLeaves.Add(leaf);
-        }
-
-        return Ok(new { step = stepAnchor, parameters = createdLeaves });
+        return Ok(new { step = stepAnchor });
     }
 
     [HttpPost("steps")]
-    public async Task<ActionResult<HierarchicalStepDto>> CreateStep(int scenarioId, CreateHierarchicalStepDto dto)
+    public async Task<ActionResult<HierarchicalStepDto>> CreateStep([FromRoute] int sid, CreateHierarchicalStepDto dto)
     {
-        var step = await _hierarchyService.CreateStepAsync(scenarioId, dto);
-        return CreatedAtAction(nameof(GetSteps), new { scenarioId }, step);
+        var step = await _hierarchyService.CreateStepAsync(sid, dto);
+        return CreatedAtAction(nameof(GetSteps), new { sid }, step);
     }
 
     [HttpPut("steps/{stepId}")]
-    public async Task<ActionResult<HierarchicalStepDto>> UpdateStep(int scenarioId, string stepId, UpdateHierarchicalStepDto dto)
+    public async Task<ActionResult<HierarchicalStepDto>> UpdateStep([FromRoute] int sid, string stepId, UpdateHierarchicalStepDto dto)
     {
-        var step = await _hierarchyService.UpdateStepAsync(scenarioId, stepId, dto);
+        var step = await _hierarchyService.UpdateStepAsync(sid, stepId, dto);
         return step is null ? NotFound() : Ok(step);
     }
 
     [HttpDelete("steps/{stepId}")]
-    public async Task<IActionResult> DeleteStep(int scenarioId, string stepId)
+    public async Task<IActionResult> DeleteStep([FromRoute] int sid, string stepId)
     {
-        var deleted = await _hierarchyService.DeleteStepAsync(scenarioId, stepId);
-        return deleted ? NoContent() : NotFound();
+        await _hierarchyService.DeleteStepAsync(sid, stepId);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Clears all steps and parameters for a scenario (clears the deck).
+    /// </summary>
+    [HttpDelete("steps/clear-scenario")]
+    public async Task<IActionResult> ClearScenario([FromRoute] int sid)
+    {
+        await _graph.DeleteAllParameterNodesForScenarioAsync(sid);
+        return NoContent();
     }
 
     [HttpPost("rollup")]
-    public async Task<ActionResult<GraphWalkResultTree>> Rollup(int scenarioId)
+    public async Task<ActionResult<GraphWalkResultTree>> Rollup([FromRoute] int sid)
     {
         try
         {
-            var result = await _hierarchyService.RollupAsync(scenarioId);
+            var result = await _hierarchyService.RollupAsync(sid);
             return Ok(result);
         }
         catch (Exception ex)

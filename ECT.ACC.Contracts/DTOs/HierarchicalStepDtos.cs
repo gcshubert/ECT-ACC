@@ -32,6 +32,26 @@ public class CreateHierarchicalStepDto
     public string Type { get; set; } = "C";
 
     /// <summary>
+    /// Energy parameter value for step anchor nodes (Apr 2026).
+    /// </summary>
+    public ScientificValueDto? E { get; set; }
+
+    /// <summary>
+    /// Control parameter value for step anchor nodes (Apr 2026).
+    /// </summary>
+    public ScientificValueDto? C { get; set; }
+
+    /// <summary>
+    /// Complexity parameter value for step anchor nodes (Apr 2026).
+    /// </summary>
+    public ScientificValueDto? K { get; set; }
+
+    /// <summary>
+    /// Time parameter value for step anchor nodes (Apr 2026).
+    /// </summary>
+    public ScientificValueDto? T { get; set; }
+
+    /// <summary>
     /// Optional rollup operator for the contributes-to edge from this node to its parent.
     /// </summary>
     public string? RollupOperator { get; set; }
@@ -87,25 +107,51 @@ public class UpdateHierarchicalStepDto
     /// Updated base numeric value for the scenario calculation.
     /// </summary>
     public ScientificValueDto? BaseValue { get; set; }
+
+    /// <summary>
+    /// Energy parameter value for step anchor nodes (Apr 2026).
+    /// </summary>
+    public ScientificValueDto? E { get; set; }
+
+    /// <summary>
+    /// Control parameter value for step anchor nodes (Apr 2026).
+    /// </summary>
+    public ScientificValueDto? C { get; set; }
+
+    /// <summary>
+    /// Complexity parameter value for step anchor nodes (Apr 2026).
+    /// </summary>
+    public ScientificValueDto? K { get; set; }
+
+    /// <summary>
+    /// Time parameter value for step anchor nodes (Apr 2026).
+    /// </summary>
+    public ScientificValueDto? T { get; set; }
 }
+
 public class HierarchicalStepDto
 {
     public string NodeId { get; set; } = string.Empty;
     public string Key { get; set; } = string.Empty;
-
-    // Maps to the Graph 'Name' property
     public string Name { get; set; } = string.Empty;
     public string Label { get; set; } = string.Empty;
-
     public string Description { get; set; } = string.Empty;
-
-    // Maps to the Graph 'Type' property (E, T, C, k)
     public string Type { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
-
     public string? ParentNodeId { get; set; }
-    public List<string> ParentNodeIds { get; set; } = new();   // ← add this
+    public List<string> ParentNodeIds { get; set; } = new();
     public string? RollupOperator { get; set; }
     public double Weight { get; set; } = 1.0;
+    // Parameter values stored directly on step anchor nodes (Apr 2026)
+    public ScientificValueDto? E { get; set; }
+    public ScientificValueDto? C { get; set; }
+    public ScientificValueDto? K { get; set; }
+    public ScientificValueDto? T { get; set; }
+    // Provenance information for each parameter
+    public string? EProvenance { get; set; }
+    public string? CProvenance { get; set; }
+    public string? KProvenance { get; set; }
+    public string? TProvenance { get; set; }
+    // Retained for backward compatibility with flat scenario consumers
     public ScientificValueDto? BaseValue { get; set; }
 }

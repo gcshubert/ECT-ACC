@@ -31,5 +31,15 @@ public interface IGraphManagementService
     Task<UsesEdgeDto> UpsertUsesEdgeAsync(int scenarioId, UsesEdgeDto dto);
 
     Task<IEnumerable<ContributesToEdgeSummaryDto>> GetContributesToEdgesAsync();
+    Task<IEnumerable<ParameterNodeDto>> GetParameterNodesByScenarioRootAsync(int scenarioId);
+    Task<IEnumerable<ParameterNodeDto>> GetAllNodesForScenarioAsync(int scenarioId);
+    Task<IEnumerable<ContributesToEdgeSummaryDto>> GetContributesToEdgesByScenarioRootAsync(int scenarioId);
+    Task<IEnumerable<ContributesToEdgeSummaryDto>> GetAllContributesToEdgesAsync();
+    Task<IEnumerable<ContributesToEdgeSummaryDto>> GetContributesToEdgesByScenarioAsync(int scenarioId);
     Task<int> GetMaxSortOrderForParentAsync(string parentNodeId);
+    
+    /// <summary>
+    /// Deletes all parameter nodes for a scenario (clears the deck).
+    /// </summary>
+    Task<bool> DeleteAllParameterNodesForScenarioAsync(int scenarioId);
 }

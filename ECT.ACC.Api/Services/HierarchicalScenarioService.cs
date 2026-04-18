@@ -32,7 +32,10 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
 
     private static string RootNodeId(int scenarioId) => $"scenario-{scenarioId}-root";
 
-    private async Task<string> EnsureRootAndUsesEdgeAsync(int scenarioId)
+    /// <summary>
+    /// Ensures the scenario graph node and root ParameterNode exist.
+    /// </summary>
+    private async Task EnsureRootNodeExistsAsync(int scenarioId)
     {
         var scenario = await _context.Scenarios
             .AsNoTracking()
@@ -41,7 +44,7 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
         if (scenario is null)
             throw new InvalidOperationException($"Scenario {scenarioId} not found.");
 
-        var scenarioGraphId = await _graph.EnsureScenarioGraphExistsAsync(
+        await _graph.EnsureScenarioGraphExistsAsync(
             scenarioId,
             scenario.Name,
             scenario.Description,
@@ -62,36 +65,31 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
                 IsActive = true
             });
         }
-
-        var usesEdge = await _graph.GetUsesEdgeAsync(scenarioId);
-        if (usesEdge is null)
-        {
-            await _graph.UpsertUsesEdgeAsync(scenarioId, new UsesEdgeDto
-            {
-                ScenarioNodeId = scenarioGraphId,
-                RootParameterNodeId = rootId,
-                BaseParameterValues = new Dictionary<string, ScientificValueDto>()
-            });
-        }
-
-        return rootId;
     }
 
     public async Task<HierarchicalStepDto> CreateStepAsync(int scenarioId, CreateHierarchicalStepDto dto)
     {
-        var rootId = await EnsureRootAndUsesEdgeAsync(scenarioId);
+        await EnsureRootNodeExistsAsync(scenarioId);
+
+        var rootId = RootNodeId(scenarioId);
         var stepId = string.IsNullOrWhiteSpace(dto.Key) ? Guid.NewGuid().ToString() : dto.Key;
 
+        // Create step anchor node with E/C/K/T stored as properties on the node
         var node = await _graph.CreateParameterNodeAsync(scenarioId, new CreateParameterNodeDto
         {
             Id = stepId,
             Name = dto.Label,
             Description = dto.Description,
-            Role = dto.Role,
+            Role = "k",
             RollupOperator = dto.RollupOperator,
-            IsActive = true
+            IsActive = true,
+            E = dto.E,
+            C = dto.C,
+            K = dto.K,
+            T = dto.T
         });
 
+        // Wire step anchor to parent via CONTRIBUTES_TO edge
         var parentId = string.IsNullOrWhiteSpace(dto.ParentNodeId) ? rootId : dto.ParentNodeId;
         var maxSortOrder = await _graph.GetMaxSortOrderForParentAsync(parentId);
         await _graph.CreateEdgeAsync(scenarioId, new CreateEdgeDto
@@ -99,24 +97,10 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
             SourceNodeId = node.Id,
             TargetNodeId = parentId,
             Relationship = "CONTRIBUTES_TO",
-            Operation = dto.RollupOperator ?? "WeightedSum",
+            Operation = dto.RollupOperator ?? "Sum",
             SortOrder = maxSortOrder + 1
         });
 
-        if (dto.BaseValue != null)
-        {
-            var uses = await _graph.GetUsesEdgeAsync(scenarioId);
-            var baseValues = uses?.BaseParameterValues ?? new Dictionary<string, ScientificValueDto>();
-            baseValues[node.Id] = dto.BaseValue;
-            await _graph.UpsertUsesEdgeAsync(scenarioId, new UsesEdgeDto
-            {
-                ScenarioNodeId = uses?.ScenarioNodeId ?? await _graph.GetScenarioGraphIdAsync(scenarioId) ?? string.Empty,
-                RootParameterNodeId = rootId,
-                BaseParameterValues = baseValues
-            });
-        }
-
-        // Build parentIds list for DAG support
         var parentIds = parentId == rootId
             ? new List<string>()
             : new List<string> { parentId };
@@ -128,60 +112,99 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
             Name = node.Name,
             Label = node.Name,
             Description = node.Description,
-            Role = dto.Role,
+            Role = "k",
             ParentNodeIds = parentIds,
             ParentNodeId = parentIds.FirstOrDefault(),
             RollupOperator = dto.RollupOperator,
             Weight = dto.Weight,
-            BaseValue = dto.BaseValue
+            E = dto.E,
+            C = dto.C,
+            K = dto.K,
+            T = dto.T
         };
     }
 
     public async Task<IEnumerable<HierarchicalStepDto>> GetStepsAsync(int scenarioId)
     {
-        // Ensure the scenario graph node and UsesEdge exist
-        await EnsureRootAndUsesEdgeAsync(scenarioId);
+        await EnsureRootNodeExistsAsync(scenarioId);
 
-        var uses = await _graph.GetUsesEdgeAsync(scenarioId);
-        if (uses is null) return Enumerable.Empty<HierarchicalStepDto>();
+        var rootId = RootNodeId(scenarioId);
+        var allNodes = (await _graph.GetAllNodesForScenarioAsync(scenarioId)).ToList();
+        var allEdges = (await _graph.GetAllContributesToEdgesAsync()).ToList();
 
-        var allNodes = await _graph.GetParameterNodesAsync(scenarioId);
-        var allEdges = await _graph.GetContributesToEdgesAsync();
+        // Anchor nodes: role=k, not the scenario root
+        var anchorNodes = allNodes
+            .Where(n => n.Id != rootId && n.Role == "k")
+            .ToList();
 
+        // Build parent lookup from edges
         var parentLookup = allEdges
             .GroupBy(e => e.ChildId)
             .ToDictionary(g => g.Key, g => g.Select(e => e.ParentId).ToList());
 
-        var rootId = RootNodeId(scenarioId);
-        var stepNodes = allNodes.Where(n => n.Id != rootId).ToList();
-        var nodeIds = stepNodes.Select(n => n.Id).ToHashSet();
-
-        var dtos = stepNodes.Select(node =>
+        return anchorNodes.Select(anchor =>
         {
-            // Declared outside the initializer — this was the root cause
-            var parentIds = parentLookup.TryGetValue(node.Id, out var ids)
-                ? ids.Where(id => id != rootId && nodeIds.Contains(id)).ToList()
+            // Debug what Graph API returns
+            Console.WriteLine($"Graph API returned for node {anchor.Id}:");
+            Console.WriteLine($"  ECoefficient: {anchor.ECoefficient}");
+            Console.WriteLine($"  EExponent: {anchor.EExponent}");
+            Console.WriteLine($"  CCoefficient: {anchor.CCoefficient}");
+            Console.WriteLine($"  CExponent: {anchor.CExponent}");
+            Console.WriteLine($"  KCoefficient: {anchor.KCoefficient}");
+            Console.WriteLine($"  KExponent: {anchor.KExponent}");
+            Console.WriteLine($"  TCoefficient: {anchor.TCoefficient}");
+            Console.WriteLine($"  TExponent: {anchor.TExponent}");
+
+            var e = anchor.ECoefficient.HasValue && anchor.EExponent.HasValue
+                ? new ScientificValueDto { Coefficient = anchor.ECoefficient.Value, Exponent = anchor.EExponent.Value }
+                : null;
+            var c = anchor.CCoefficient.HasValue && anchor.CExponent.HasValue
+                ? new ScientificValueDto { Coefficient = anchor.CCoefficient.Value, Exponent = anchor.CExponent.Value }
+                : null;
+            var k = anchor.KCoefficient.HasValue && anchor.KExponent.HasValue
+                ? new ScientificValueDto { Coefficient = anchor.KCoefficient.Value, Exponent = anchor.KExponent.Value }
+                : null;
+            var t = anchor.TCoefficient.HasValue && anchor.TExponent.HasValue
+                ? new ScientificValueDto { Coefficient = anchor.TCoefficient.Value, Exponent = anchor.TExponent.Value }
+                : null;
+
+            var parentIds = parentLookup.TryGetValue(anchor.Id, out var ids)
+                ? ids.Where(id => id != rootId).ToList()
                 : new List<string>();
 
-            return new HierarchicalStepDto
+            var edge = allEdges.FirstOrDefault(e => e.ChildId == anchor.Id);
+
+            var result = new HierarchicalStepDto
             {
-                NodeId = node.Id,
-                Key = node.Id,
-                Name = node.Name,
-                Label = node.Name,
-                Description = node.Description,
-                Role = node.Role,
+                NodeId = anchor.Id,
+                Key = anchor.Id,
+                Name = anchor.Name,
+                Label = anchor.Name,
+                Description = anchor.Description,
+                Role = anchor.Role,
                 ParentNodeIds = parentIds,
                 ParentNodeId = parentIds.FirstOrDefault(),
-                RollupOperator = allEdges.FirstOrDefault(e => e.ChildId == node.Id)?.RollupOperator,
-                Weight = allEdges.FirstOrDefault(e => e.ChildId == node.Id)?.Weight ?? 1.0,
-                BaseValue = uses.BaseParameterValues.TryGetValue(node.Id, out var val)
-                    ? val
-                    : null
+                RollupOperator = edge?.RollupOperator,
+                Weight = edge?.Weight ?? 1.0,
+                E = e,
+                C = c,
+                K = k,
+                T = t,
+                EProvenance = anchor.EProvenance,
+                CProvenance = anchor.CProvenance,
+                KProvenance = anchor.KProvenance,
+                TProvenance = anchor.TProvenance
             };
-        });
 
-        return dtos.Where(dto => dto.ParentNodeId == null || dto.ParentNodeId == rootId || nodeIds.Contains(dto.ParentNodeId ?? ""));
+            // Debug what backend returns to frontend
+            Console.WriteLine($"Backend returning to frontend for node {anchor.Id}:");
+            Console.WriteLine($"  E: {e?.Coefficient}×10^{e?.Exponent}");
+            Console.WriteLine($"  C: {c?.Coefficient}×10^{c?.Exponent}");
+            Console.WriteLine($"  K: {k?.Coefficient}×10^{k?.Exponent}");
+            Console.WriteLine($"  T: {t?.Coefficient}×10^{t?.Exponent}");
+
+            return result;
+        });
     }
 
     public async Task<HierarchicalStepDto?> UpdateStepAsync(int scenarioId, string stepId, UpdateHierarchicalStepDto dto)
@@ -189,20 +212,20 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
         var node = await _graph.GetParameterNodeAsync(scenarioId, stepId);
         if (node is null) return null;
 
-        // 1. Update Core Node Properties
-        // Using the nullable properties to allow partial updates
         var updated = await _graph.UpdateParameterNodeAsync(scenarioId, stepId, new UpdateParameterNodeDto
         {
-            // Support both Name/Label and Type/Role naming for engine parity
             Name = dto.Label ?? dto.Name ?? node.Name,
             Description = dto.Description ?? node.Description,
-            Role = dto.Role ?? dto.Type ?? node.Role,
+            Role = node.Role,
             RollupOperator = dto.RollupOperator ?? node.RollupOperator,
-            IsActive = true
+            IsActive = true,
+            E = dto.E,
+            C = dto.C,
+            K = dto.K,
+            T = dto.T
         });
 
-        // 2. Persist Weight/Edge Properties (New for Hierarchy)
-        // This addresses the logic previously missing from the flat model
+        // Update edge weight/operator if provided
         if (dto.Weight.HasValue || dto.RollupOperator != null)
         {
             await _graph.UpdateEdgePropertiesAsync(scenarioId, stepId, new UpdateEdgeDto
@@ -212,23 +235,6 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
             });
         }
 
-        // 3. Handle BaseValue (Existing Logic)
-        if (dto.BaseValue != null)
-        {
-            var uses = await _graph.GetUsesEdgeAsync(scenarioId);
-            var baseValues = uses?.BaseParameterValues ?? new Dictionary<string, ScientificValueDto>();
-            baseValues[stepId] = dto.BaseValue;
-
-            await _graph.UpsertUsesEdgeAsync(scenarioId, new UsesEdgeDto
-            {
-                ScenarioNodeId = uses?.ScenarioNodeId ?? await _graph.GetScenarioGraphIdAsync(scenarioId) ?? string.Empty,
-                RootParameterNodeId = await EnsureRootAndUsesEdgeAsync(scenarioId),
-                BaseParameterValues = baseValues
-            });
-        }
-
-        // 4. Return Refreshed DTO
-        // Use the local variables and dto values to avoid CS1061
         return new HierarchicalStepDto
         {
             NodeId = stepId,
@@ -236,33 +242,21 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
             Name = updated?.Name ?? node.Name,
             Label = updated?.Name ?? node.Name,
             Description = updated?.Description ?? node.Description,
-            Role = updated?.Role ?? node.Role,
-            Type = updated?.Role ?? node.Role,
+            Role = node.Role,
+            RollupOperator = dto.RollupOperator ?? node.RollupOperator,
             Weight = dto.Weight ?? 1.0,
-
-            // Fix: Pull from the DTO directly or keep it null if not updated
-            BaseValue = dto.BaseValue
+            E = dto.E,
+            C = dto.C,
+            K = dto.K,
+            T = dto.T
         };
     }
 
     public async Task<bool> DeleteStepAsync(int scenarioId, string stepId)
     {
-        // Remove base values for this node and all its leaves from the UsesEdge
-        var uses = await _graph.GetUsesEdgeAsync(scenarioId);
-        if (uses is not null)
-        {
-            var keysToRemove = uses.BaseParameterValues.Keys
-                .Where(k => k == stepId || k.StartsWith($"{stepId}-"))
-                .ToList();
-            foreach (var key in keysToRemove)
-                uses.BaseParameterValues.Remove(key);
-
-            if (keysToRemove.Count > 0)
-                await _graph.UpsertUsesEdgeAsync(scenarioId, uses);
-        }
-
         return await _graphClient.DeleteStepWithLeavesAsync(stepId);
     }
+
     public async Task<GraphWalkResultTree> RollupAsync(int scenarioId)
     {
         var scenarioGraphId = await _graph.GetScenarioGraphIdAsync(scenarioId);
@@ -271,18 +265,5 @@ public class HierarchicalScenarioService : IHierarchicalScenarioService
                 $"Scenario graph node not found for scenario {scenarioId}");
 
         return await _graphClient.GetScenarioWalkTreeAsync(scenarioGraphId);
-    }
-    private static void SetBaseValue(Dictionary<string, double> dict, string nodeId, ScientificValueDto value)
-    {
-        dict[$"{nodeId}:coeff"] = value.Coefficient;
-        dict[$"{nodeId}:exp"] = value.Exponent;
-    }
-
-    private static ScientificValueDto? GetBaseValue(Dictionary<string, double> dict, string nodeId)
-    {
-        if (dict.TryGetValue($"{nodeId}:coeff", out var coeff) &&
-            dict.TryGetValue($"{nodeId}:exp", out var exp))
-            return new ScientificValueDto { Coefficient = coeff, Exponent = exp };
-        return null;
     }
 }
